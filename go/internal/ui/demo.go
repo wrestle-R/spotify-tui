@@ -101,6 +101,17 @@ func (d *demoPlayer) Call(_ context.Context, method string, params any, _ any) e
 		d.state.Status = "playing"
 	}
 	switch method {
+	case "play_sequence":
+		uris, _ := p["uris"].([]string)
+		index, _ := p["index"].(int)
+		if index >= 0 && index < len(uris) {
+			for i, t := range d.tracks {
+				if t.URI == uris[index] {
+					choose(i)
+					break
+				}
+			}
+		}
 	case "play_track":
 		for i, t := range d.tracks {
 			if t.URI == p["uri"] {

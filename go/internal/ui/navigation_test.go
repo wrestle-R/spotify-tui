@@ -42,6 +42,8 @@ func (p *playerStub) Call(_ context.Context, method string, _ any, _ any) error 
 }
 func fixture() Model {
 	m := New(config.Config{ClientID: strings.Repeat("a", 32)}, config.Paths{}, &auth.Manager{}, libraryStub{}, &playerStub{})
+	m.view = "liked"
+	m.title = "Liked songs"
 	m.loading = false
 	m.playlistsLoading = false
 	for i := 0; i < 50; i++ {
@@ -64,6 +66,7 @@ func TestLibraryToTracksAndBack(t *testing.T) {
 	m := fixture()
 	m, _ = key(m, tea.KeyDown)
 	m, _ = key(m, tea.KeyDown)
+	m, _ = key(m, tea.KeyDown)
 	m, cmd := key(m, tea.KeyRight)
 	if m.sidebar || m.view != "playlist" || m.playlistID != "0" || !m.loading || cmd == nil {
 		t.Fatalf("open did not update focus/loading: %+v", m)
@@ -74,7 +77,7 @@ func TestLibraryToTracksAndBack(t *testing.T) {
 		t.Fatal("collection did not finish loading")
 	}
 	m, _ = key(m, tea.KeyEsc)
-	if !m.sidebar || m.sideSelection != 2 {
+	if !m.sidebar || m.sideSelection != 3 {
 		t.Fatal("back lost the selected playlist")
 	}
 	m, cmd = key(m, tea.KeyEnter)
@@ -136,7 +139,7 @@ func TestEnterStartsPlayerAndPreventsDuplicateCommands(t *testing.T) {
 	}
 	result := cmd()
 	p := m.Player.(*playerStub)
-	if p.ensured != 1 || len(p.calls) != 1 || p.calls[0] != "play_track" {
+	if p.ensured != 1 || len(p.calls) != 1 || p.calls[0] != "play_sequence" {
 		t.Fatal("play did not connect before sending track")
 	}
 	updated, _ := m.Update(result)

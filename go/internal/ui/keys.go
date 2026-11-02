@@ -21,9 +21,15 @@ func (m Model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if key == "ctrl+u" {
 		return m.with(m.requestUpdate())
 	}
+	if key == "ctrl+right" || key == "ctrl+left" {
+		method, label := "next", "Next song"
+		if key == "ctrl+left" {
+			method, label = "previous", "Previous song"
+		}
+		return m.with(m.perform(label, playerCommand{method, nil}))
+	}
 	if m.help {
-		m.help = false
-		return m, nil
+		return m.updateHelp(msg)
 	}
 	if m.inputMode != "" {
 		return m.editInput(msg)
@@ -61,8 +67,9 @@ func (m Model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			return tea.Quit()
 		}
-	case "?", "f1":
+	case "i", "?", "f1":
 		m.help = true
+		m.helpOffset = 0
 	case "/", "ctrl+f":
 		m.search()
 	case "esc", "left", "h":
@@ -117,9 +124,9 @@ func (m Model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m.with(m.playSelected())
 		}
 		return m.with(m.perform("Toggle playback", playerCommand{"toggle_pause", nil}))
-	case "n", "ctrl+right":
+	case "n":
 		return m.with(m.perform("Next song", playerCommand{"next", nil}))
-	case "p", "ctrl+left":
+	case "p":
 		return m.with(m.perform("Previous song", playerCommand{"previous", nil}))
 	case "[", "]", "alt+left", "alt+right":
 		if m.player.URI == "" {
@@ -182,11 +189,27 @@ func (m Model) editInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	runes := []rune(m.input)
 	m.cursor = max(0, min(m.cursor, len(runes)))
 	switch msg.String() {
+	case "up":
+		if m.inputMode == "search" {
+			m.selectHistory(-1)
+		}
+	case "down":
+		if m.inputMode == "search" {
+			m.selectHistory(1)
+		}
+	case "ctrl+x":
+		if m.inputMode == "search" {
+			m.history.Searches = nil
+			m.historySelection = -1
+			m.saveHistory()
+			m.notify("Search history cleared.", "success")
+		}
 	case "esc":
 		if m.inputMode != "setup" {
 			m.inputMode = ""
 			m.input = ""
 			m.cursor = 0
+			m.sidebar = m.searchSidebar
 			m.notify("Search cancelled.", "info")
 		}
 	case "left", "ctrl+b":
@@ -248,6 +271,7 @@ func (m Model) editInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.inputMode = ""
 			m.input = ""
 			m.cursor = 0
+			m.rememberSearch(value)
 			return m.with(m.open("search", "Search: "+value, value))
 		}
 	default:
@@ -263,6 +287,7 @@ func (m Model) editInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			added = added[:limit]
 		}
 		if len(added) > 0 {
+			m.historySelection = -1
 			m.input = string(runes[:m.cursor]) + string(added) + string(runes[m.cursor:])
 			m.cursor += len(added)
 		}

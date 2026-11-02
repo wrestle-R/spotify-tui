@@ -22,6 +22,7 @@ import (
 	"github.com/godbus/dbus/v5/introspect"
 	"github.com/godbus/dbus/v5/prop"
 	"github.com/wrestle-R/Spotify-Tui/go/internal/ipc"
+	"github.com/wrestle-R/Spotify-Tui/go/internal/mpris"
 	"github.com/wrestle-R/Spotify-Tui/go/internal/spotify"
 )
 
@@ -295,6 +296,7 @@ func (s *Service) action(id int32) {
 		case 4:
 			err = s.player.Call(ctx, "previous", nil, nil)
 		case 5:
+			_ = mpris.Stop(ctx)
 			err = s.player.Stop(ctx)
 			if err == nil {
 				_ = s.Quit()

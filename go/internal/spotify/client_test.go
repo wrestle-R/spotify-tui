@@ -92,3 +92,32 @@ func TestCleanRemoteTextAndPlaybackEligibility(t *testing.T) {
 		t.Fatal("non-Spotify URI playable")
 	}
 }
+
+func TestExploreUsesTopTracksAndFallsBackForExistingLogin(t *testing.T) {
+	var denied atomic.Bool
+	c := fixtureClient(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/me/top/tracks":
+			if denied.Load() {
+				w.WriteHeader(403)
+				return
+			}
+			fmt.Fprint(w, `{"items":[{"uri":"spotify:track:top","name":"Top song"}]}`)
+		case "/me":
+			fmt.Fprint(w, `{"id":"fixture-account"}`)
+		case "/me/tracks":
+			fmt.Fprint(w, `{"items":[{"item":{"uri":"spotify:track:liked","name":"Liked song"}}],"next":null}`)
+		default:
+			t.Errorf("unexpected route %s", r.URL.Path)
+		}
+	})
+	top, err := c.Explore(context.Background())
+	if err != nil || len(top.Tracks) != 1 || top.Tracks[0].Name != "Top song" || top.Warning != "" {
+		t.Fatal("top songs unavailable", err)
+	}
+	denied.Store(true)
+	fallback, err := c.Explore(context.Background())
+	if err != nil || len(fallback.Tracks) != 1 || fallback.Tracks[0].Name != "Liked song" || !strings.Contains(fallback.Warning, "grants") {
+		t.Fatal("old token fallback failed", err)
+	}
+}

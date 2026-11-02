@@ -3,6 +3,7 @@ package ui
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -49,6 +50,10 @@ type loginMsg struct{ err error }
 type tickMsg time.Time
 
 type Model struct {
+	searchSidebar                              bool
+	history                                    localHistory
+	historySelection, helpOffset               int
+	lastHistoryURI                             string
 	resumeCommand                              tea.Cmd
 	resumeURI                                  string
 	resumePosition                             int64
@@ -81,7 +86,9 @@ type Model struct {
 }
 
 func New(c config.Config, p config.Paths, a *auth.Manager, library Library, player Player) Model {
-	m := Model{Cfg: c, Paths: p, Auth: a, Library: library, Player: player, width: 100, height: 30, title: "Liked songs", view: "liked", sidebar: true, loading: c.ClientID != "", playlistsLoading: c.ClientID != "", status: "Choose a collection, then Enter. / searches Spotify."}
+	m := Model{Cfg: c, Paths: p, Auth: a, Library: library, Player: player, width: 100, height: 30, title: "Explore", view: "explore", sidebar: true, loading: c.ClientID != "", playlistsLoading: c.ClientID != "", status: "Choose a collection, then Enter. / searches Spotify."}
+	m.historySelection = -1
+	m.loadHistory()
 	if c.ClientID == "" {
 		m.inputMode = "setup"
 		m.status = "Paste the public client ID from your Spotify Developer app."
@@ -93,7 +100,7 @@ func (m Model) Init() tea.Cmd {
 	if m.Cfg.ClientID == "" {
 		return tea.Batch(tick(), m.checkUpdates())
 	}
-	return tea.Batch(tick(), m.checkUpdates(), m.resumeCommand, m.loadPlaylists(), m.loadRows("liked", "", m.generation), m.pollPlayer())
+	return tea.Batch(tick(), m.checkUpdates(), m.resumeCommand, m.loadPlaylists(), m.loadRows("explore", "", m.generation), m.pollPlayer())
 }
 func (m *Model) notify(message, kind string) { m.status = message; m.noticeKind = kind }
 func (m Model) loadPlaylists() tea.Cmd {
@@ -112,6 +119,49 @@ func (m Model) loadRowsContext(parent context.Context, view, value string, gener
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(parent, 2*time.Minute)
 		defer cancel()
+		if view == "explore" {
+			var collection spotify.Collection
+			var err error
+			if explorer, ok := m.Library.(interface {
+				Explore(context.Context) (spotify.Collection, error)
+			}); ok {
+				collection, err = explorer.Explore(ctx)
+			} else {
+				collection, err = m.Library.Tracks(ctx, "")
+			}
+			entries := append([]listeningEntry(nil), m.history.Listening...)
+			sort.SliceStable(entries, func(i, j int) bool { return entries[i].Plays > entries[j].Plays })
+			seen := map[string]bool{}
+			var tracks []spotify.Track
+			add := func(t spotify.Track) {
+				if t.CanPlay() && !seen[t.URI] && len(tracks) < 50 {
+					seen[t.URI] = true
+					tracks = append(tracks, t)
+				}
+			}
+			for _, t := range collection.Tracks {
+				add(t)
+			}
+			// Local favourites are useful even before the new Spotify scope is granted.
+			if collection.Warning != "" {
+				tracks = nil
+				seen = map[string]bool{}
+				for _, e := range entries {
+					add(e.Track)
+				}
+				for _, t := range collection.Tracks {
+					add(t)
+				}
+			} else {
+				for _, e := range entries {
+					add(e.Track)
+				}
+			}
+			if len(tracks) > 0 {
+				err = nil
+			}
+			return rowsMsg{generation: generation, tracks: tracks, warning: collection.Warning, err: err}
+		}
 		if view == "search" {
 			items, e := m.Library.Search(ctx, value)
 			return rowsMsg{generation: generation, tracks: items, err: e}
@@ -299,6 +349,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			m.player = msg.state
+			m.rememberPlaying()
 		} else {
 			m.player.Connected = false
 			m.player.LoggedIn = false
@@ -316,11 +367,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.tracks = msg.tracks
 			m.rowError = ""
-			m.warning = ""
+			m.warning = msg.warning
 			if msg.stale {
 				m.warning = "Cached metadata: " + msg.warning
 			}
-			m.notify(fmt.Sprintf("%d tracks · Enter plays the selected song", len(msg.tracks)), "info")
+			label := fmt.Sprintf("%d tracks · Enter plays the selected song", len(msg.tracks))
+			if msg.warning != "" {
+				label = msg.warning
+			}
+			m.notify(label, "info")
 			m.selected = min(m.selected, max(0, len(m.tracks)-1))
 		}
 	case playlistsMsg:
@@ -364,9 +419,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.libraryGeneration++
 			m.playlistsLoading = true
 			m.sideSelection = 0
-			cmd := m.open("liked", "Liked songs", "")
+			cmd := m.open("explore", "Explore", "")
 			return m, tea.Batch(m.loadPlaylists(), cmd)
 		}
+	case tea.MouseMsg:
+		return m.updateMouse(msg)
 	case tea.KeyMsg:
 		return m.updateKey(msg)
 	}
@@ -387,9 +444,9 @@ func duration(ms int64) string {
 	ms = max(int64(0), ms)
 	return fmt.Sprintf("%d:%02d", ms/60000, (ms/1000)%60)
 }
-func (m Model) sideCount() int { return len(m.playlists) + 2 }
+func (m Model) sideCount() int { return len(m.playlists) + 3 }
 func (m Model) sideLabels() []string {
-	labels := []string{"Liked songs", "Search Spotify"}
+	labels := []string{"Explore", "Liked songs", "Search Spotify"}
 	for _, p := range m.playlists {
 		labels = append(labels, p.Name)
 	}
@@ -404,23 +461,34 @@ func (m *Model) move(delta int) {
 	}
 }
 func (m *Model) search() {
+	if m.inputMode != "search" {
+		m.searchSidebar = m.sidebar
+	}
+	m.sidebar = false
 	m.inputMode = "search"
-	m.input = m.searchQuery
+	m.input = ""
+	m.historySelection = -1
 	m.cursor = len([]rune(m.input))
 	m.notify("Type a song or artist. Enter searches; Esc cancels.", "info")
 }
 func (m *Model) activateSide() tea.Cmd {
 	switch m.sideSelection {
 	case 0:
+		if m.view == "explore" && !m.loading && m.rowError == "" {
+			m.sidebar = false
+			return nil
+		}
+		return m.open("explore", "Explore", "")
+	case 1:
 		if m.view == "liked" && !m.loading && m.rowError == "" {
 			m.sidebar = false
 			return nil
 		}
 		return m.open("liked", "Liked songs", "")
-	case 1:
+	case 2:
 		m.search()
 	default:
-		i := m.sideSelection - 2
+		i := m.sideSelection - 3
 		if i >= 0 && i < len(m.playlists) {
 			p := m.playlists[i]
 			if m.view == "playlist" && m.playlistID == p.ID && !m.loading && m.rowError == "" {
@@ -440,6 +508,8 @@ func (m *Model) refresh() tea.Cmd {
 		return m.loadPlaylists()
 	}
 	switch m.view {
+	case "explore":
+		return m.open("explore", "Explore", "")
 	case "liked":
 		return m.open("liked", "Liked songs", "")
 	case "playlist":
@@ -465,7 +535,20 @@ func (m *Model) playSelected() tea.Cmd {
 		m.notify("This item isn't available for playback.", "error")
 		return nil
 	}
-	return m.perform("Play "+spotify.Clean(t.Name), playerCommand{"play_track", map[string]any{"uri": t.URI}})
+	if m.view == "explore" || m.view == "search" {
+		return m.perform("Play "+spotify.Clean(t.Name)+" · Spotify Autoplay follows", playerCommand{"play_track", map[string]any{"uri": t.URI}})
+	}
+	uris := make([]string, 0, len(m.tracks))
+	index := 0
+	for i, track := range m.tracks {
+		if track.CanPlay() {
+			if i == m.selected {
+				index = len(uris)
+			}
+			uris = append(uris, track.URI)
+		}
+	}
+	return m.perform("Play "+spotify.Clean(t.Name), playerCommand{"play_sequence", map[string]any{"uris": uris, "index": index}})
 }
 
 // Keep remote and user text on one terminal line, including pasted input.

@@ -48,7 +48,7 @@ func (c *Client) Call(ctx context.Context, method string, params any, result any
 		return errors.New("playback helper not running; press c to connect after provider setup")
 	}
 	defer conn.Close()
-	deadline := time.Now().Add(9 * time.Second)
+	deadline := time.Now().Add(20 * time.Second)
 	if d, ok := ctx.Deadline(); ok && d.Before(deadline) {
 		deadline = d
 	}

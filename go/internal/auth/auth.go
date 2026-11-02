@@ -178,7 +178,7 @@ func Challenge(verifier string) string {
 }
 
 func AuthorizationURL(client, redirect, state, verifier string) string {
-	v := url.Values{"client_id": {client}, "response_type": {"code"}, "redirect_uri": {redirect}, "state": {state}, "code_challenge_method": {"S256"}, "code_challenge": {Challenge(verifier)}, "scope": {"user-library-read playlist-read-private playlist-read-collaborative"}}
+	v := url.Values{"client_id": {client}, "response_type": {"code"}, "redirect_uri": {redirect}, "state": {state}, "code_challenge_method": {"S256"}, "code_challenge": {Challenge(verifier)}, "scope": {"user-library-read playlist-read-private playlist-read-collaborative user-top-read"}}
 	return "https://accounts.spotify.com/authorize?" + v.Encode()
 }
 

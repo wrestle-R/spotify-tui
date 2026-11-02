@@ -287,3 +287,21 @@ func (c *Client) Search(ctx context.Context, query string) ([]Track, error) {
 	err := c.get(ctx, "/search?type=track&limit=10&q="+url.QueryEscape(query), &result)
 	return result.Tracks.Items, err
 }
+
+// Explore uses Spotify affinity data when granted, and keeps old logins useful.
+func (c *Client) Explore(ctx context.Context) (Collection, error) {
+	var top struct {
+		Items []Track `json:"items"`
+	}
+	err := c.get(ctx, "/me/top/tracks?time_range=short_term&limit=30", &top)
+	if err == nil && len(top.Items) > 0 {
+		return Collection{Tracks: top.Items}, nil
+	}
+	liked, likedErr := c.Tracks(ctx, "")
+	if err != nil {
+		liked.Warning = "Your rotation + liked songs · L grants Spotify top-track access"
+	} else {
+		liked.Warning = "Liked songs · Spotify is still learning your favourites"
+	}
+	return liked, likedErr
+}

@@ -100,10 +100,7 @@ func (m Model) View() string {
 		search = active.Render(" / ") + m.inputLine(w-3) + muted.Render("  Enter search · Esc cancel")
 	}
 	lines = append(lines, fit(search, w), "")
-	sideW := 0
-	if w >= 80 {
-		sideW = min(32, max(24, w/4))
-	}
+	sideW := m.sideWidth()
 	trackW := w
 	if sideW > 0 {
 		trackW = w - sideW - 3
@@ -115,7 +112,10 @@ func (m Model) View() string {
 		leftTitle += fmt.Sprintf(" · %d playlists", len(m.playlists))
 	}
 	rightTitle := m.title
-	if m.warning != "" {
+	if m.inputMode == "search" {
+		rightTitle = "Search Spotify"
+	}
+	if m.warning != "" && m.view != "explore" {
 		rightTitle += " · cached"
 	}
 	if m.view != "downloads" && !m.loading && len(m.tracks) > 0 {
@@ -215,10 +215,8 @@ func (m Model) View() string {
 	} else {
 		lines = append(lines, muted.Render(plainFit(notice, w)))
 	}
-	hint := "Space pause/resume · n/p next/prev · [/] seek · +/- volume"
-	if m.warning != "" {
-		hint = m.warning
-	}
+	hint := m.controlLine()
+
 	if !m.player.Connected {
 		hint = "Enter on a song starts the player · c reconnect · L sign in"
 	} else if !m.player.LoggedIn {
@@ -227,19 +225,19 @@ func (m Model) View() string {
 	if m.inputMode == "search" {
 		hint = "←/→ edit · Ctrl-G clear · Enter search · Esc cancel"
 	}
-	if m.updateNotice != "" {
+	if m.updateNotice != "" && !m.player.Connected {
 		hint = m.updateNotice
 	}
 	lines = append(lines, muted.Render(plainFit(hint, w)))
-	footer := "↑↓ Move  ← Library  →/Enter Open  / Search  ? Help  q Quit"
+	footer := "Up/Down Move  Left Library  Enter Open  / Search  i Instructions  q Quit"
 	if !m.sidebar {
-		footer = "↑↓ Move  Enter Play  Esc Library  / Search  ? Help  q Quit"
+		footer = "Up/Down Move  Enter Play  Esc Library  / Search  i Instructions  q Quit"
 	}
 	if w < 80 {
 		if m.sidebar {
-			footer = "↑↓ Move · Enter Open · Tab Songs · / Search · ? Help"
+			footer = "Up/Down Move · Enter Open · / Search · i Help"
 		} else {
-			footer = "↑↓ Move · Enter Play · Esc Back · / Search · ? Help"
+			footer = "Up/Down Move · Enter Play · Esc Back · i Help"
 		}
 	}
 	lines = append(lines, bright.Render(plainFit(footer, w)))
@@ -264,6 +262,9 @@ func (m Model) inputLine(width int) string {
 	return clip(before+selectedStyle.Render(cursorChar)+after, width)
 }
 func (m Model) trackLine(row, width int) string {
+	if m.inputMode == "search" {
+		return m.historyLine(row, width)
+	}
 	if m.view == "downloads" {
 		messages := []string{"Offline Spotify downloads: unsupported.", "", "The current provider cannot download music.", "A playback cache is not an offline library.", "", "Esc returns to your library."}
 		if row < len(messages) {
@@ -344,11 +345,4 @@ func bounded(lines []string, w, h int) string {
 		lines[i] = lipgloss.NewStyle().Background(lipgloss.Color("#121212")).Render(fit(lines[i], w))
 	}
 	return strings.Join(lines, "\n")
-}
-func (m Model) helpView() string {
-	lines := []string{active.Render(" spotify tui / keyboard"), "", "↑/↓ or j/k     Move in the focused pane", "←/h or Esc     Return to library", "→/l or Enter   Open collection; Enter on song plays", "Tab / Shift-Tab  Switch panes", "PgUp/PgDn · Home/End  Page or jump in focused pane", "/ or Ctrl-F    Search · Enter submits · Esc cancels", "Space          Pause / resume", "n/p · Ctrl-→/←  Next / previous", "[ / ]          Seek backward / forward 5 seconds", "+ / -          Volume · s shuffle · r repeat", "a queue song · P play playlist from its start", "R refresh pane · c reconnect · L browser sign-in", "q quit (audio continues) · Q stop audio and quit", "Ctrl-U check, install stable update and restart", "", "Offline downloads are unsupported.", "", "Press Esc, ? or any key to return."}
-	if len(lines) > m.height && m.height > 1 {
-		lines = append(lines[:m.height-1], "Esc returns to your music.")
-	}
-	return bounded(lines, m.width, m.height)
 }

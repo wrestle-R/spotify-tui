@@ -17,6 +17,7 @@ import (
 	"github.com/wrestle-R/Spotify-Tui/go/internal/auth"
 	"github.com/wrestle-R/Spotify-Tui/go/internal/config"
 	"github.com/wrestle-R/Spotify-Tui/go/internal/ipc"
+	"github.com/wrestle-R/Spotify-Tui/go/internal/mpris"
 	"github.com/wrestle-R/Spotify-Tui/go/internal/spotify"
 	"github.com/wrestle-R/Spotify-Tui/go/internal/tray"
 	"github.com/wrestle-R/Spotify-Tui/go/internal/ui"
@@ -69,7 +70,7 @@ func run() error {
 		}
 	}
 	if len(os.Args) > 1 && (os.Args[1] == "--demo" || os.Args[1] == "demo") {
-		_, err := tea.NewProgram(ui.NewDemo(), tea.WithAltScreen()).Run()
+		_, err := tea.NewProgram(ui.NewDemo(), tea.WithAltScreen(), tea.WithMouseCellMotion()).Run()
 		return err
 	}
 	p, err := config.PathsForUser()
@@ -165,6 +166,8 @@ func run() error {
 			}
 			fmt.Println("Key stored. In the TUI press c to start Soloist, then pair Spotify TUI Local once.")
 			return nil
+		case "media":
+			return mpris.Run(context.Background(), player)
 		case "tray":
 			return tray.Run(context.Background(), player, executable)
 		case "tray-stop":
@@ -191,6 +194,7 @@ func run() error {
 			if e != nil {
 				return e
 			}
+			_ = mpris.Stop(ctx)
 			if e = tray.Stop(ctx); e != nil {
 				return e
 			}
@@ -202,6 +206,7 @@ func run() error {
 		case "stop":
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
+			_ = mpris.Stop(ctx)
 			return player.Stop(ctx)
 		case "connect":
 			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
@@ -209,11 +214,13 @@ func run() error {
 			if err := player.Ensure(ctx, cfg, p, manager.Vault); err != nil {
 				return err
 			}
+			_ = mpris.Ensure(executable)
 			fmt.Println("Playback helper started. Use doctor to check pairing; select Spotify TUI Local in Spotify if unpaired.")
 			return nil
 		case "logout":
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
+			_ = mpris.Stop(ctx)
 			if e := player.Stop(ctx); e != nil {
 				return errors.New("helper has not stopped; credentials were left intact, retry logout after stopping it")
 			}
@@ -229,7 +236,10 @@ func run() error {
 			if e := os.RemoveAll(filepath.Join(p.Data, "soloist")); e != nil {
 				return e
 			}
-			fmt.Println("This app's credentials and cached library removed.")
+			if e := os.Remove(filepath.Join(p.State, "history.json")); e != nil && !os.IsNotExist(e) {
+				return e
+			}
+			fmt.Println("This app's credentials, local history and cached library removed.")
 			return nil
 		case "doctor":
 			fmt.Println("spotify-tui", version)
@@ -238,6 +248,7 @@ func run() error {
 			fmt.Println("Client ID configured:", cfg.ClientID != "")
 			_, e := exec.LookPath(cfg.SoloistPath)
 			fmt.Println("Soloist executable available:", e == nil)
+			fmt.Println("MPRIS: org.mpris.MediaPlayer2.spotify_tui (Linux)")
 			fmt.Println("Socket:", player.Socket)
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
@@ -317,6 +328,7 @@ func run() error {
 			return fmt.Errorf("unknown command %q; use --help", args[0])
 		}
 	}
+	_ = mpris.Ensure(executable)
 	if !noTray {
 		_ = tray.Ensure(executable)
 	}
@@ -324,7 +336,7 @@ func run() error {
 	if resumeURI != "" {
 		model = model.WithResume(resumeURI, resumePosition)
 	}
-	result, err := tea.NewProgram(model, tea.WithAltScreen()).Run()
+	result, err := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseCellMotion()).Run()
 	if err != nil {
 		return err
 	}
@@ -332,6 +344,7 @@ func run() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	if finished.StopRequested() {
+		_ = mpris.Stop(ctx)
 		return tray.Stop(ctx)
 	}
 	if next := finished.RestartPath(); next != "" {
@@ -339,6 +352,7 @@ func run() error {
 		if state.Status == "playing" && state.PositionUpdatedAt > 0 {
 			state.PositionMS += max(int64(0), time.Now().UnixMilli()-state.PositionUpdatedAt)
 		}
+		_ = mpris.Stop(ctx)
 		if err = tray.Stop(ctx); err != nil {
 			return fmt.Errorf("update installed; quit old tray before reopening: %w", err)
 		}

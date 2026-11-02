@@ -1,5 +1,7 @@
+mod sequence;
 use fs2::FileExt;
 use futures_util::{SinkExt, StreamExt};
+use sequence::Sequence;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::{
@@ -39,6 +41,7 @@ struct Pending {
     expected_status: Option<&'static str>,
     expected_uri: Option<String>,
     confirmed: bool,
+    sequence: Option<Option<Sequence>>,
 }
 impl Pending {
     fn observe(&mut self, state: &Value) {
@@ -93,6 +96,7 @@ async fn stop_provider(child: &mut tokio::process::Child) {
 fn command(method: &str, params: &Value) -> Result<Value, String> {
     let mut v = json!({"type":"command"});
     let name = match method {
+        "play_sequence" => return Ok(Sequence::parse(params)?.play()),
         "play_track" | "play_collection" => {
             let uri = params["uri"].as_str().ok_or("Missing Spotify URI")?;
             if !["spotify:track:","spotify:playlist:","spotify:album:"].iter().any(|p|uri.starts_with(p)) || uri.len()>256 || uri.chars().any(char::is_control) { return Err("Invalid playable Spotify URI".into()); }
@@ -147,6 +151,20 @@ fn apply_event(state: &mut Value, event: &Value) {
         "volume_changed" => state["volume"] = event["volume"].clone(),
         "options_changed" => update_options(state, &event["options"]),
         _ => {}
+    }
+}
+fn position_ms(state: &Value) -> u64 {
+    let position = state["position_ms"].as_u64().unwrap_or(0);
+    if state["status"] == "playing" {
+        position.saturating_add(
+            now_ms().saturating_sub(
+                state["position_updated_at_ms"]
+                    .as_u64()
+                    .unwrap_or_else(now_ms),
+            ),
+        )
+    } else {
+        position
     }
 }
 fn now_ms() -> u64 {
@@ -213,6 +231,7 @@ async fn bridge(
     mut rx: mpsc::Receiver<Command>,
     mut stop: watch::Receiver<bool>,
 ) {
+    let mut sequence: Option<Sequence> = None;
     loop {
         let connection = time::timeout(Duration::from_secs(5), connect_async(&address)).await;
         if let Ok(Ok((mut ws, _))) = connection {
@@ -222,12 +241,39 @@ async fn bridge(
                 s["error"] = json!("");
             }
             let mut pending: Option<Pending> = None;
+            let mut automatic: Option<Command> = None;
+            let mut ending: Option<Instant> = None;
             let mut tick = time::interval(Duration::from_millis(100));
             loop {
                 tokio::select! {
                     _=stop.changed()=>{let _=ws.close(None).await;return},
-                    Some(mut cmd)=rx.recv(), if pending.is_none()=>{
+                    Some(mut cmd)=async { if let Ok(cmd)=rx.try_recv(){Some(cmd)}else if let Some(cmd)=automatic.take(){Some(cmd)}else{rx.recv().await} }, if pending.is_none()=>{
                         if shared.state.lock().await["logged_in"]!=true {let _=cmd.reply.send(Err("Soloist is not paired; select Spotify TUI Local once in the official Spotify device list".into()));continue}
+                        if cmd.value["_automatic"]!=true {automatic=None;if matches!(cmd.value["command"].as_str(),Some("play"|"seek"|"pause"|"_toggle_pause"|"skip_next"|"skip_prev")){ending=None;}}
+                        let mut next_sequence = None;
+                        if !cmd.value["_sequence"].is_null() {
+                            match Sequence::parse(&json!({"uris":cmd.value["_sequence"],"index":cmd.value["_index"]})) {
+                                Ok(s)=>next_sequence=Some(Some(s)),
+                                Err(e)=>{let _=cmd.reply.send(Err(e));continue}
+                            }
+                        } else if cmd.value["command"]=="play" && !cmd.value["uri"].is_null() {
+                            next_sequence=Some(None);
+                        } else if matches!(cmd.value["command"].as_str(),Some("skip_next"|"skip_prev")) {
+                            if let Some(current)=sequence.as_ref() {
+                                let state=shared.state.lock().await;
+                                let forward=cmd.value["command"]=="skip_next";
+                                let target=if !forward && position_ms(&state)>3000 {Some(current.clone())} else {current.step(forward,&state)};
+                                if let Some(target)=target {cmd.value=target.play();next_sequence=Some(Some(target));} else {next_sequence=Some(None);}
+                            }
+                        } else if cmd.value["command"]=="add_to_queue" {
+                            if let Some(current)=sequence.as_mut() {
+                                if current.uris.len()>=5000 {let _=cmd.reply.send(Err("Sequence is full".into()));continue}
+                                current.uris.push(cmd.value["uri"].as_str().unwrap_or_default().to_owned());
+                                let _=cmd.reply.send(Ok(()));continue;
+                            }
+                        }
+                        // Internal sequence fields never cross the provider boundary.
+                        if let Some(obj)=cmd.value.as_object_mut(){obj.remove("_sequence");obj.remove("_index");obj.remove("_automatic");}
                         if cmd.value["command"]=="_toggle_pause" {
                             let state=shared.state.lock().await;
                             cmd.value["command"]=json!(if state["status"]=="playing" || state["status"]=="buffering" {"pause"}else{"play"});
@@ -235,7 +281,7 @@ async fn bridge(
                         let expected_status=match cmd.value["command"].as_str(){Some("pause")=>Some("paused"),Some("play")=>Some("playing"),_=>None};
                         let expected_uri=cmd.value["uri"].as_str().filter(|v|cmd.value["command"]=="play" && v.starts_with("spotify:track:")).map(String::from);
                         if ws.send(Message::Text(cmd.value.to_string().into())).await.is_err(){let _=cmd.reply.send(Err("Provider disconnected".into()));break}
-                        pending=Some(Pending{command:cmd,started:Instant::now(),accepted:false,expected_status,expected_uri,confirmed:expected_status.is_none()});
+                        pending=Some(Pending{command:cmd,started:Instant::now(),accepted:false,expected_status,expected_uri,confirmed:expected_status.is_none(),sequence:next_sequence});
                     },
                     item=ws.next()=>{
                         match item {
@@ -243,7 +289,23 @@ async fn bridge(
                                 if text.len()>MAX_FRAME{break}
                                 if let Ok(event)=serde_json::from_str::<Value>(&text){
                                     let mut state=shared.state.lock().await;
+                                    let before=state.clone();
                                     apply_event(&mut state,&event);
+                                    if pending.is_none() && automatic.is_none() {
+                                        if let Some(current)=sequence.as_ref() {
+                                            let duration=before["duration_ms"].as_u64().unwrap_or(0);
+                                            if before["uri"]==current.uri() && before["status"]=="playing" && duration>0 && position_ms(&before)>=duration.saturating_sub(2000) {ending=Some(Instant::now());}
+                                            let boundary=ending.is_some_and(|t|t.elapsed()<Duration::from_secs(3)) && before["repeat"]!="track" && (state["uri"]!=before["uri"] || state["status"]=="stopped");
+                                            if current.naturally_finished(&before,&state) || boundary {
+                                                if let Some(next)=current.step(true,&before) {
+                                                    let(tx,_)=oneshot::channel();let mut value=next.play();value["_automatic"]=json!(true);automatic=Some(Command{value,reply:tx});
+                                                } else {sequence=None;}
+                                            } else if state["uri"]!=before["uri"] && state["uri"]!=current.uri() {
+                                                // Respect playback changes from another Spotify controller.
+                                                sequence=None;
+                                            }
+                                        }
+                                    }
                                     if let Some(p)=pending.as_mut() {
                                         if matches!(event["type"].as_str(),Some("playback_state"|"playback_changed"|"track_changed")) {p.observe(&state);}
                                         if event["type"]=="command_result" && p.command.value["command"]==event["command"] {
@@ -256,7 +318,7 @@ async fn bridge(
                                     if event["type"]=="error" {
                                         if let Some(p)=pending.take(){let _=p.command.reply.send(Err("Provider rejected command; check pairing, available actions and track eligibility".into()));}
                                     }else if pending.as_ref().is_some_and(Pending::complete) {
-                                        if let Some(p)=pending.take(){let _=p.command.reply.send(Ok(()));}
+                                        if let Some(p)=pending.take(){if let Some(next)=p.sequence {sequence=next;ending=None;}let _=p.command.reply.send(Ok(()));}
                                     }
                                 }
                             },
@@ -265,7 +327,7 @@ async fn bridge(
                             _=>{},
                         }
                     },
-                    _=tick.tick()=>{if pending.as_ref().is_some_and(|p|p.started.elapsed()>Duration::from_secs(5)){if let Some(p)=pending.take(){let _=p.command.reply.send(Err("Provider command timed out; outcome unknown".into()));}break}},
+                    _=tick.tick()=>{if pending.as_ref().is_some_and(|p|p.started.elapsed()>Duration::from_secs(15)){if let Some(p)=pending.take(){let _=p.command.reply.send(Err("Provider command timed out; outcome unknown".into()));}break}},
                 }
             }
             if let Some(p) = pending.take() {
@@ -341,7 +403,7 @@ async fn client(
                     let (tx, rx) = oneshot::channel();
                     match shared.commands.try_send(Command { value, reply: tx }) {
                         Err(_) => Err("Playback request queue is full".into()),
-                        Ok(()) => match time::timeout(Duration::from_secs(7), rx).await {
+                        Ok(()) => match time::timeout(Duration::from_secs(17), rx).await {
                             Ok(Ok(Ok(()))) => Ok(json!({"accepted":true})),
                             Ok(Ok(Err(e))) => Err(e),
                             _ => Err("Provider unavailable or command outcome unknown".into()),
@@ -726,6 +788,95 @@ mod tests {
         assert_eq!(server.await.unwrap(), vec!["pause", "play"]);
         let _ = shared.stop.send(true);
         task.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn sequence_continues_after_buffering_and_position_reset() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = format!("ws://{}", listener.local_addr().unwrap());
+        let server = tokio::spawn(async move {
+            let (socket, _) = listener.accept().await.unwrap();
+            let mut ws = tokio_tungstenite::accept_async(socket).await.unwrap();
+            ws.send(Message::Text(
+                json!({"type":"auth_state","logged_in":true})
+                    .to_string()
+                    .into(),
+            ))
+            .await
+            .unwrap();
+            let mut uri = String::from("spotify:track:a");
+            let mut playing = false;
+            let mut ended = false;
+            while let Some(Ok(Message::Text(text))) = ws.next().await {
+                let v: Value = serde_json::from_str(&text).unwrap();
+                assert!(v.get("_sequence").is_none());
+                let name = v["command"].as_str().unwrap();
+                if name == "play" {
+                    uri = v["uri"].as_str().unwrap().to_owned();
+                    playing = true;
+                    ws.send(Message::Text(
+                        json!({"type":"command_result","command":"play"})
+                            .to_string()
+                            .into(),
+                    ))
+                    .await
+                    .unwrap();
+                }
+                ws.send(Message::Text(json!({"type":"playback_state","status":if playing {"playing"} else {"paused"},"item":{"uri":uri,"decorations":{"identity":{"name":"Fixture"},"playback":{"duration_ms":10000}}},"position":{"position_ms":1000},"options":{"shuffle":false}}).to_string().into())).await.unwrap();
+                if name == "get_state" && playing && uri == "spotify:track:a" && !ended {
+                    ended = true;
+                    time::sleep(Duration::from_millis(30)).await;
+                    for event in [
+                        json!({"type":"position_sync","position":{"position_ms":9900}}),
+                        json!({"type":"playback_changed","status":"buffering"}),
+                        json!({"type":"position_sync","position":{"position_ms":0}}),
+                        json!({"type":"track_changed","item":{"uri":"spotify:track:autoplay","decorations":{"playback":{"duration_ms":10000}}}}),
+                    ] {
+                        ws.send(Message::Text(event.to_string().into()))
+                            .await
+                            .unwrap();
+                    }
+                }
+            }
+        });
+        let (tx, rx) = mpsc::channel(16);
+        let (stop, _) = watch::channel(false);
+        let shared = Arc::new(Shared {
+            state: Mutex::new(initial_state()),
+            commands: tx,
+            stop,
+        });
+        let task = tokio::spawn(bridge(address, shared.clone(), rx, shared.stop.subscribe()));
+        time::timeout(Duration::from_secs(2), async {
+            while shared.state.lock().await["logged_in"] != true {
+                time::sleep(Duration::from_millis(5)).await
+            }
+        })
+        .await
+        .unwrap();
+        let (reply, done) = oneshot::channel();
+        shared
+            .commands
+            .send(Command {
+                value: command(
+                    "play_sequence",
+                    &json!({"uris":["spotify:track:a","spotify:track:b"],"index":0}),
+                )
+                .unwrap(),
+                reply,
+            })
+            .await
+            .unwrap();
+        assert!(done.await.unwrap().is_ok());
+        time::timeout(Duration::from_secs(2), async {
+            while shared.state.lock().await["uri"] != "spotify:track:b" {
+                time::sleep(Duration::from_millis(5)).await
+            }
+        })
+        .await
+        .unwrap();
+        task.abort();
+        server.abort();
     }
 
     #[test]
