@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"math"
+	"net/url"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -90,6 +91,10 @@ func Stop(ctx context.Context) error {
 	}
 	return nil
 }
+func validArtURL(value string) bool {
+	u, err := url.Parse(value)
+	return err == nil && u.Scheme == "https" && u.User == nil && !strings.ContainsAny(value, "'\"`\\\n\r") && (u.Host == "i.scdn.co" || u.Host == "image-cdn-ak.spotifycdn.com" || u.Host == "image-cdn-fa.spotifycdn.com")
+}
 func trackID(uri string) dbus.ObjectPath {
 	if uri == "" {
 		return "/org/mpris/MediaPlayer2/TrackList/NoTrack"
@@ -138,6 +143,12 @@ func (s *Service) values(iface string) map[string]dbus.Variant {
 			metadata["xesam:title"] = dbus.MakeVariant(state.Title)
 			metadata["xesam:artist"] = dbus.MakeVariant([]string{state.Artist})
 			metadata["xesam:url"] = dbus.MakeVariant(state.URI)
+			if state.Album != "" {
+				metadata["xesam:album"] = dbus.MakeVariant(state.Album)
+			}
+			if validArtURL(state.ArtURL) {
+				metadata["mpris:artUrl"] = dbus.MakeVariant(state.ArtURL)
+			}
 		}
 		ready := state.Connected && state.LoggedIn
 		loaded := ready && state.URI != ""
@@ -362,14 +373,8 @@ func Run(ctx context.Context, player Player) error {
 		return err
 	}
 	defer conn.Close()
-	reply, err := conn.RequestName(Name, dbus.NameFlagDoNotQueue)
-	if err != nil {
-		return err
-	}
-	if reply != dbus.RequestNameReplyPrimaryOwner {
-		return nil
-	}
 	s := &Service{player: player, conn: conn}
+	s.refresh()
 	t := &transport{s}
 	r := &root{}
 	l := &lifecycle{done: make(chan struct{})}
@@ -405,6 +410,13 @@ func Run(ctx context.Context, player Player) error {
 	node := &introspect.Node{Interfaces: []introspect.Interface{{Name: rootInterface, Methods: introspect.Methods(r), Properties: rootProps}, {Name: playerInterface, Methods: methods, Properties: playerProps, Signals: []introspect.Signal{{Name: "Seeked", Args: []introspect.Arg{{Name: "Position", Type: "x"}}}}}, prop.IntrospectData}}
 	if err = conn.Export(introspect.NewIntrospectable(node), path, "org.freedesktop.DBus.Introspectable"); err != nil {
 		return err
+	}
+	reply, err := conn.RequestName(Name, dbus.NameFlagDoNotQueue)
+	if err != nil {
+		return err
+	}
+	if reply != dbus.RequestNameReplyPrimaryOwner {
+		return nil
 	}
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer cancel()

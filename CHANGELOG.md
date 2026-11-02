@@ -2,13 +2,26 @@
 
 Features and fixes, grouped by release series, newest first. Full details, upgrade instructions and validation live on each version's page. GitHub hosts the Linux and Apple Silicon Mac downloads.
 
-**Latest stable: [v0.5.0](#v050)** · Stable releases only
+**Latest stable: [v0.5.1](#v051)** · Stable releases only
 
-[Download archive ↗](https://github.com/wrestle-R/spotify-tui-rdp/releases/tag/v0.5.0)
+[Download archive ↗](https://github.com/wrestle-R/spotify-tui-rdp/releases/tag/v0.5.1)
 
 ## 0.5.x
 
 **Explore, proper next/previous and desktop media controls**
+
+<a id="v051"></a>
+
+### v0.5.1
+
+2 November 2026 · **Stable** · Linux x86_64 and Apple Silicon macOS
+
+- Show a styled shortcut overlay while i is held; release or switch away to dismiss it.
+- Group shortcuts into responsive columns with highlighted keys and clickable section jumps.
+- Publish album artwork and album names through MPRIS; retain metadata across partial provider updates.
+- Export complete media properties before announcing the player on D-Bus.
+
+[Linux ↓](https://github.com/wrestle-R/spotify-tui-rdp/releases/download/v0.5.1/spotify-tui_0.5.1_linux_amd64.tar.gz) · [Apple Silicon Mac ↓](https://github.com/wrestle-R/spotify-tui-rdp/releases/download/v0.5.1/spotify-tui_0.5.1_darwin_arm64.tar.gz) · [Full details →](docs/releases/v0.5.1.md)
 
 <a id="v050"></a>
 
@@ -114,4 +127,4 @@ The [planning-v0.1.0 bundle](https://github.com/wrestle-R/Spotify-Tui/releases/t
 
 Each release page explains the tested packages, requirements, known issues and available validation evidence. The current Linux package is checksum-verified and unsigned. Offline downloads, broader provider recovery and long-session memory/stability validation remain outstanding. The repository and release downloads are public.
 
-[Read the latest release details →](docs/releases/v0.5.0.md)
+[Read the latest release details →](docs/releases/v0.5.1.md)

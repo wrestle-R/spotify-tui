@@ -1,6 +1,6 @@
 .PHONY: build test check package package-check clean
 
-VERSION ?= 0.5.0
+VERSION ?= 0.5.1
 
 build:
 	mkdir -p dist

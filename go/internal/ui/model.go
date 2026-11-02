@@ -50,6 +50,7 @@ type loginMsg struct{ err error }
 type tickMsg time.Time
 
 type Model struct {
+	helpHeld                                   bool
 	searchSidebar                              bool
 	history                                    localHistory
 	historySelection, helpOffset               int

@@ -13,7 +13,6 @@ import (
 	"syscall"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/wrestle-R/Spotify-Tui/go/internal/auth"
 	"github.com/wrestle-R/Spotify-Tui/go/internal/config"
 	"github.com/wrestle-R/Spotify-Tui/go/internal/ipc"
@@ -25,7 +24,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "0.5.0"
+var version = "0.5.1"
 
 const helpText = `Spotify TUI (Go interface + Rust helper)
 
@@ -70,7 +69,7 @@ func run() error {
 		}
 	}
 	if len(os.Args) > 1 && (os.Args[1] == "--demo" || os.Args[1] == "demo") {
-		_, err := tea.NewProgram(ui.NewDemo(), tea.WithAltScreen(), tea.WithMouseCellMotion()).Run()
+		_, err := ui.Run(ui.NewDemo())
 		return err
 	}
 	p, err := config.PathsForUser()
@@ -336,11 +335,11 @@ func run() error {
 	if resumeURI != "" {
 		model = model.WithResume(resumeURI, resumePosition)
 	}
-	result, err := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseCellMotion()).Run()
+	result, err := ui.Run(model)
 	if err != nil {
 		return err
 	}
-	finished := result.(ui.Model)
+	finished := result
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	if finished.StopRequested() {

@@ -229,9 +229,9 @@ func (m Model) View() string {
 		hint = m.updateNotice
 	}
 	lines = append(lines, muted.Render(plainFit(hint, w)))
-	footer := "Up/Down Move  Left Library  Enter Open  / Search  i Instructions  q Quit"
+	footer := "Up/Down Move  Left Library  Enter Open  / Search  Hold i Help  q Quit"
 	if !m.sidebar {
-		footer = "Up/Down Move  Enter Play  Esc Library  / Search  i Instructions  q Quit"
+		footer = "Up/Down Move  Enter Play  Esc Library  / Search  Hold i Help  q Quit"
 	}
 	if w < 80 {
 		if m.sidebar {

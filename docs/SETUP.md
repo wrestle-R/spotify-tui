@@ -87,13 +87,13 @@ Explore is the first collection and opens on startup. It uses Spotify top tracks
 
 Liked songs and playlists continue from the selected row using a sequence owned by the Rust helper, including when the terminal is closed. `Ctrl-Right` / `n` skips forward and `Ctrl-Left` / `p` goes back (or restarts the current song after three seconds). Collection transitions can briefly buffer while Soloist changes context. A new selection replaces the local sequence; another Spotify controller can take over playback. A sequence accepts up to 5,000 playable tracks. `P` starts the native playlist context from its beginning. Search currently returns ten results.
 
-Press `i`, `?` or F1 for the full scrollable instructions. Arrow/page keys and the mouse wheel scroll the instructions, and Esc returns. Click a collection to open it, a song to play it, a saved search to rerun it or the progress bar to seek. The player buttons support clicks too. Hold Shift for your terminal's normal text selection.
+Hold `i` to show the shortcut overlay over your music; release it to hide it. This uses real key-release reporting in terminals such as Kitty, Ghostty and Foot. Other terminals can use `?` or F1 to toggle the same overlay. Arrow/page keys and the mouse wheel scroll the guide, and `1`–`6` or a section label jumps to a group. Switching away also dismisses a held overlay. Click a collection to open it, a song to play it, a saved search to rerun it or the progress bar to seek. The player buttons support clicks too. Hold Shift for your terminal's normal text selection.
 
 Search shows the last 30 distinct queries, stored locally with up to 100 played songs in the private state directory (`history.json`, mode 0600). Up/Down recalls queries; Ctrl-X clears search history; Ctrl-G clears only the input. Ctrl-arrows control playback while typing. Demo history never touches disk, and logout removes local history.
 
 ## Linux media keys and MPRIS
 
-The player registers `org.mpris.MediaPlayer2.spotify_tui` on the session bus, independently of the tray. It works with `--no-tray` and continues after `q`. The desktop can use play/pause, next/previous, position, metadata, volume, shuffle and repeat. MPRIS is a Linux desktop integration; macOS does not gain media-key support in this release.
+The player registers `org.mpris.MediaPlayer2.spotify_tui` on the session bus, independently of the tray. It works with `--no-tray` and continues after `q`. The desktop can use play/pause, next/previous, position, track/artist/album metadata, Spotify cover art, volume, shuffle and repeat. Metadata is ready on the first D-Bus read, and partial provider snapshots retain the current track's details. MPRIS is a Linux desktop integration; macOS does not gain media-key support in this release.
 
 ```bash
 playerctl -p spotify_tui play-pause

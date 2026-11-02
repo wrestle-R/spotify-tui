@@ -174,19 +174,69 @@ fn now_ms() -> u64 {
         .as_millis() as u64
 }
 fn update_track(state: &mut Value, item: &Value) {
-    state["uri"] = item["uri"].clone();
-    state["title"] = item["decorations"]["identity"]["name"].clone();
-    state["duration_ms"] = item["decorations"]["playback"]["duration_ms"].clone();
-    let artists = item["decorations"]["creators"]
-        .as_array()
-        .map(|a| {
-            a.iter()
-                .filter_map(|e| e["entity"]["decorations"]["identity"]["name"].as_str())
-                .collect::<Vec<_>>()
-                .join(", ")
-        })
-        .unwrap_or_default();
-    state["artist"] = json!(artists);
+    let uri = item["uri"].as_str().unwrap_or_default();
+    let same = state["uri"] == uri && !uri.is_empty();
+    if !same {
+        for key in ["title", "artist", "album", "art_url"] {
+            state[key] = json!("");
+        }
+        state["duration_ms"] = json!(0);
+    }
+    state["uri"] = json!(uri);
+    if let Some(name) = item["decorations"]["identity"]["name"].as_str() {
+        state["title"] = json!(name);
+    }
+    if let Some(duration) = item["decorations"]["playback"]["duration_ms"].as_u64() {
+        state["duration_ms"] = json!(duration);
+    }
+    if let Some(album) =
+        item["decorations"]["parent"]["entity"]["decorations"]["identity"]["name"].as_str()
+    {
+        state["album"] = json!(album);
+    }
+    if let Some(images) = item["decorations"]["visual_identity"]["cover"].as_array() {
+        let art = images
+            .iter()
+            .filter_map(|image| {
+                image["url"]
+                    .as_str()
+                    .filter(|value| valid_art_url(value))
+                    .map(|url| {
+                        let rank = match image["size"].as_str() {
+                            Some("xlarge") => 4,
+                            Some("large") => 3,
+                            Some("default") => 2,
+                            _ => 1,
+                        };
+                        (rank, url)
+                    })
+            })
+            .max_by_key(|(rank, _)| *rank)
+            .map(|(_, url)| url)
+            .unwrap_or_default();
+        state["art_url"] = json!(art);
+    }
+    if let Some(creators) = item["decorations"]["creators"].as_array() {
+        state["artist"] = json!(creators
+            .iter()
+            .filter_map(|e| e["entity"]["decorations"]["identity"]["name"].as_str())
+            .collect::<Vec<_>>()
+            .join(", "));
+    }
+}
+fn valid_art_url(value: &str) -> bool {
+    url::Url::parse(value).is_ok_and(|url| {
+        url.scheme() == "https"
+            && matches!(
+                url.host_str(),
+                Some("i.scdn.co" | "image-cdn-ak.spotifycdn.com" | "image-cdn-fa.spotifycdn.com")
+            )
+            && !value
+                .chars()
+                .any(|c| c.is_control() || matches!(c, '\'' | '"' | '`' | '\\'))
+            && url.username().is_empty()
+            && url.password().is_none()
+    })
 }
 fn update_position(state: &mut Value, pos: &Value) {
     if !pos["position_ms"].is_null() {
@@ -593,6 +643,33 @@ mod tests {
         );
         assert_eq!(s["repeat"], "track");
     }
+    #[test]
+    fn artwork_and_album_follow_tracks_and_partial_snapshots() {
+        let mut state = initial_state();
+        update_track(
+            &mut state,
+            &json!({"uri":"spotify:track:a","decorations":{"identity":{"name":"Song A"},"playback":{"duration_ms":123000},"parent":{"entity":{"decorations":{"identity":{"name":"Album A"}}}},"visual_identity":{"cover":[{"url":"https://i.scdn.co/image/small","size":"small"},{"url":"https://i.scdn.co/image/large","size":"large"}]}}}),
+        );
+        assert_eq!(state["art_url"], "https://i.scdn.co/image/large");
+        assert_eq!(state["album"], "Album A");
+        update_track(
+            &mut state,
+            &json!({"uri":"spotify:track:a","decorations":{}}),
+        );
+        assert_eq!(state["title"], "Song A");
+        assert_eq!(state["duration_ms"], 123000);
+        assert_eq!(state["art_url"], "https://i.scdn.co/image/large");
+        update_track(
+            &mut state,
+            &json!({"uri":"spotify:track:b","decorations":{"identity":{"name":"Song B"}}}),
+        );
+        assert_eq!(state["art_url"], "");
+        assert_eq!(state["album"], "");
+        assert!(!valid_art_url("file:///tmp/cover.png"));
+        assert!(!valid_art_url("https://example.com/cover.png"));
+        assert!(!valid_art_url("https://i.scdn.co/image/quote'"));
+    }
+
     #[test]
     fn sanitizes_command_boundary() {
         assert!(command("play_track", &json!({"uri":"file:///etc/passwd"})).is_err());

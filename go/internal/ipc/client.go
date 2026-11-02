@@ -27,6 +27,8 @@ type State struct {
 	Status            string `json:"status"`
 	Title             string `json:"title"`
 	Artist            string `json:"artist"`
+	Album             string `json:"album"`
+	ArtURL            string `json:"art_url"`
 	URI               string `json:"uri"`
 	PositionMS        int64  `json:"position_ms"`
 	DurationMS        int64  `json:"duration_ms"`

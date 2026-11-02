@@ -33,7 +33,7 @@ func (m Model) updateMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			delta = -3
 		}
 		if m.help {
-			m.helpOffset = max(0, min(m.helpOffset+delta, max(0, len(m.helpLines())-max(1, m.height-4))))
+			m.scrollHelp(delta)
 			return m, nil
 		}
 		if m.inputMode == "search" {
@@ -52,10 +52,7 @@ func (m Model) updateMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if m.help {
-		if msg.Y == m.height-1 {
-			m.help = false
-		}
-		return m, nil
+		return m.clickHelp(msg.X, msg.Y)
 	}
 	if msg.Y == 1 {
 		m.search()

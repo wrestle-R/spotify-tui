@@ -34,7 +34,7 @@ func TestSessionBusTransportAndProperties(t *testing.T) {
 	if os.Getenv("SPOTIFY_TUI_TEST_DBUS") != "1" {
 		t.Skip("run in isolated dbus-run-session with SPOTIFY_TUI_TEST_DBUS=1")
 	}
-	p := &playerFixture{state: ipc.State{Connected: true, LoggedIn: true, Status: "paused", URI: "spotify:track:fixture", Title: "Fixture song", Artist: "Fixture artist", PositionMS: 2000, DurationMS: 180000, Volume: 45}}
+	p := &playerFixture{state: ipc.State{Connected: true, LoggedIn: true, Status: "paused", URI: "spotify:track:fixture", Title: "Fixture song", Artist: "Fixture artist", Album: "Fixture album", ArtURL: "https://i.scdn.co/image/fixture", PositionMS: 2000, DurationMS: 180000, Volume: 45}}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	done := make(chan error, 1)
@@ -68,6 +68,9 @@ func TestSessionBusTransportAndProperties(t *testing.T) {
 	}
 	metadata := values["Metadata"].Value().(map[string]dbus.Variant)
 	id := metadata["mpris:trackid"].Value().(dbus.ObjectPath)
+	if metadata["mpris:artUrl"].Value() != "https://i.scdn.co/image/fixture" || metadata["xesam:album"].Value() != "Fixture album" {
+		t.Fatal("album artwork metadata missing")
+	}
 	if !id.IsValid() || metadata["mpris:length"].Value() != int64(180000000) {
 		t.Fatal("invalid MPRIS metadata")
 	}

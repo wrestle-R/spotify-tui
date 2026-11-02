@@ -8,18 +8,18 @@ Go for the TUI, Rust for the local playback helper. **Linux x86_64 and Apple Sil
 
 Actual terminal capture of `--demo`, using generic sample playlists and songs. The demo produces no audio and reads no account data.
 
-[What's new](CHANGELOG.md) · [Full release details](docs/releases/v0.5.0.md)
+[What's new](CHANGELOG.md) · [Full release details](docs/releases/v0.5.1.md)
 
 ## Download
 
-**[Download for Linux x86_64](https://github.com/wrestle-R/spotify-tui-rdp/releases/download/v0.5.0/spotify-tui_0.5.0_linux_amd64.tar.gz)** · **[Download for Apple Silicon Mac](https://github.com/wrestle-R/spotify-tui-rdp/releases/download/v0.5.0/spotify-tui_0.5.0_darwin_arm64.tar.gz)** · [Release notes and checksums](https://github.com/wrestle-R/spotify-tui-rdp/releases/tag/v0.5.0)
+**[Download for Linux x86_64](https://github.com/wrestle-R/spotify-tui-rdp/releases/download/v0.5.1/spotify-tui_0.5.1_linux_amd64.tar.gz)** · **[Download for Apple Silicon Mac](https://github.com/wrestle-R/spotify-tui-rdp/releases/download/v0.5.1/spotify-tui_0.5.1_darwin_arm64.tar.gz)** · [Release notes and checksums](https://github.com/wrestle-R/spotify-tui-rdp/releases/tag/v0.5.1)
 
 The archive includes the TUI, Rust helper and local installer. Linux needs glibc 2.39+; Mac needs Apple Silicon and macOS 15+. Both need a Premium account and separate [Soloist setup](docs/SETUP.md#local-playback-through-official-soloist). Soloist comes from Spotify and isn't bundled here. macOS binaries are ad-hoc signed, not Apple-notarized.
 
 The repo and downloads are public:
 
 ```bash
-curl -fL https://github.com/wrestle-R/spotify-tui-rdp/releases/download/v0.5.0/download.py -o download.py
+curl -fL https://github.com/wrestle-R/spotify-tui-rdp/releases/download/v0.5.1/download.py -o download.py
 less download.py
 python3 download.py download --destination ./spotify-tui-download
 bash ./spotify-tui-download/install.sh
@@ -47,7 +47,7 @@ Use your own Spotify Developer application's public client ID, register `http://
 
 Sign-in happens in your normal browser. `provider-key` hides the key while you type. Select **Spotify TUI Local** in Spotify's device picker for the initial pairing; you can close the official player afterward. Full [setup instructions](docs/SETUP.md) cover verification, the keyring and pairing.
 
-Explore opens first with familiar songs. Click or press Enter to play; Ctrl-Right/Left skips next/previous. Press **i** for all instructions, including mouse controls and saved search history. Linux media keys and `playerctl -p spotify_tui` work through MPRIS. Spotify Autoplay follows Explore/search tracks when enabled in your account; after upgrading, `L` grants top-track access for Explore.
+Explore opens first with familiar songs. Click or press Enter to play; Ctrl-Right/Left skips next/previous. Hold **i** for the shortcut overlay (release to hide; **?** toggles it), including mouse controls and saved search history. Linux media keys and `playerctl -p spotify_tui` work through MPRIS. Spotify Autoplay follows Explore/search tracks when enabled in your account; after upgrading, `L` grants top-track access for Explore.
 
 The Linux tray starts with the player when your panel supports it. macOS runs the terminal player without a tray. `q` leaves music playing; `Q` stops music and exits the tray. The app checks stable updates on startup; **Ctrl-U** installs a verified update and restarts. [Tray and update help](docs/SETUP.md#tray-and-updates).
 

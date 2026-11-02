@@ -16,6 +16,7 @@ import time
 binary=Path(sys.argv[1]).resolve()
 version=subprocess.check_output([str(binary),'--version'],text=True).strip().split()[-1]
 experience=tuple(map(int,version.split('.'))) >= (0,5,0)
+hold=tuple(map(int,version.split('.'))) >= (0,5,1)
 with tempfile.TemporaryDirectory(prefix='spotify-pty-') as temporary:
     env=dict(os.environ, HOME=temporary, TERM='xterm-256color')
     for key in ('XDG_CONFIG_HOME','XDG_DATA_HOME','XDG_CACHE_HOME','XDG_STATE_HOME','XDG_RUNTIME_DIR'):
@@ -44,6 +45,12 @@ with tempfile.TemporaryDirectory(prefix='spotify-pty-') as temporary:
             os.write(master,b'\x1b');drain(.1)
             for keys in (b'\x1b[1;5C',b'\x1b[1;5D',b'\x1b[<0;45;6M',b'\x1b[<0;45;6m'):
                 os.write(master,keys);drain(.1)
+        if hold:
+            os.write(master,b'\x1b[?31u');drain(.1)
+            os.write(master,b'\x1b[105;1:1u');drain(.2)
+            assert b'Release to close' in output, 'held instructions did not open'
+            os.write(master,b'\x1b[105;1:2u');drain(.1)
+            os.write(master,b'\x1b[105;1:3u');drain(.2)
         fcntl.ioctl(slave,termios.TIOCSWINSZ,struct.pack('HHHH',24,70,0,0))
         os.kill(process.pid,signal.SIGWINCH)
         drain(.15)
