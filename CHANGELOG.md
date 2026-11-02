@@ -2,9 +2,28 @@
 
 Features and fixes, grouped by release series, newest first. Full details, upgrade instructions and validation live on each version's page. GitHub hosts the Linux and Apple Silicon Mac downloads.
 
-**Latest stable: [v0.4.0](#v040)** · Stable releases only
+**Latest stable: [v0.5.0](#v050)** · Stable releases only
 
-[Download archive ↗](https://github.com/wrestle-R/Spotify-Tui/releases/tag/v0.4.0)
+[Download archive ↗](https://github.com/wrestle-R/spotify-tui-rdp/releases/tag/v0.5.0)
+
+## 0.5.x
+
+**Explore, proper next/previous and desktop media controls**
+
+<a id="v050"></a>
+
+### v0.5.0
+
+2 November 2026 · **Stable** · Linux x86_64 and Apple Silicon macOS
+
+- Open Explore first with Spotify top tracks, local rotation and liked-song fallback.
+- Continue liked songs and playlists from the selected row, with next/previous owned by the background helper.
+- Add Linux MPRIS media keys and playerctl controls, including metadata, position and volume.
+- Put all instructions on i, with scrolling and plain footer labels.
+- Save private search history and support mouse selection, history, scrolling and seeking.
+- Keep Spotify Autoplay account-controlled, including after Explore and search tracks.
+
+[Apple Silicon Mac ↓](https://github.com/wrestle-R/spotify-tui-rdp/releases/download/v0.5.0/spotify-tui_0.5.0_darwin_arm64.tar.gz) · [Linux ↓](https://github.com/wrestle-R/spotify-tui-rdp/releases/download/v0.5.0/spotify-tui_0.5.0_linux_amd64.tar.gz) · [Full details →](docs/releases/v0.5.0.md)
 
 ## 0.4.x
 
@@ -95,4 +114,4 @@ The [planning-v0.1.0 bundle](https://github.com/wrestle-R/Spotify-Tui/releases/t
 
 Each release page explains the tested packages, requirements, known issues and available validation evidence. The current Linux package is checksum-verified and unsigned. Offline downloads, broader provider recovery and long-session memory/stability validation remain outstanding. The repository and release downloads are public.
 
-[Read the latest release details →](docs/releases/v0.4.0.md)
+[Read the latest release details →](docs/releases/v0.5.0.md)

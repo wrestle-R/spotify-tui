@@ -1,6 +1,6 @@
 # Linux and Apple Silicon Mac downloads
 
-For v0.4.0, use the native platform downloads and portable Python downloader in [the release guide](releases/v0.4.0.md). See [Mac requirements](MACOS.md). Both archives contain an installer and matching Go/Rust binaries. Python 3.9+ is required for installation only; macOS builds are ad-hoc signed, not notarized.
+For v0.5.0, use the native platform downloads and portable Python downloader in [the release guide](releases/v0.5.0.md). See [Mac requirements](MACOS.md). Both archives contain an installer and matching Go/Rust binaries. Python 3.9+ is required for installation only; macOS builds are ad-hoc signed, not notarized.
 
 ## Older Linux-only download path
 

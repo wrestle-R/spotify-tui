@@ -228,11 +228,12 @@ export default function Docs() {
             offline cold-start check failed.
           </p>
           <p>
-            Search currently returns ten results. A liked song plays
-            individually; full liked-song sequencing and playlist offsets are
-            unfinished. MPRIS/media keys and long-session memory testing are
-            still pending. Connectivity and Soloist session restoration can
-            occasionally stall. Press c to reconnect.
+            Search currently returns ten results, and long-session memory
+            testing is still pending. Explore, search history, mouse controls,
+            collection sequencing and Linux MPRIS media controls are available
+            from v0.5.0. Press i in the terminal for the full instructions.
+            Connectivity and Soloist session restoration can occasionally
+            stall. Press c to reconnect.
           </p>
           <p>
             This project does not promise ad-free playback for Free accounts.

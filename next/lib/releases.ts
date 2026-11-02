@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-export const repo = "https://github.com/wrestle-R/Spotify-Tui";
+export const repo = "https://github.com/wrestle-R/spotify-tui-rdp";
 const root = path.resolve(process.cwd(), "..");
 export function versions() {
   return fs

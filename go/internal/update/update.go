@@ -27,7 +27,7 @@ import (
 	"time"
 )
 
-const Repository = "wrestle-R/Spotify-Tui"
+const Repository = "wrestle-R/spotify-tui-rdp"
 
 var stable = regexp.MustCompile(`^v?([0-9]+)\.([0-9]+)\.([0-9]+)$`)
 

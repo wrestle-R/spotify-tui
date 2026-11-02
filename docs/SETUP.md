@@ -83,7 +83,27 @@ If verification fails in the normal browser too, complete Spotify's recovery or 
 - `q` closes the TUI with audio continuing; `Q` stops the helper and exits; Ctrl-C exits. `spotify-tui stop` stops this project's helper from another terminal.
 - `d` displays the unsupported offline capability. It cannot download songs.
 
-Selecting an individual liked song plays that track; a full liked-song sequence and a playlist offset remain unimplemented. `P` plays the playlist context from its beginning. Search returns the first ten results. MPRIS/media keys remain unimplemented.
+Explore is the first collection and opens on startup. It uses Spotify top tracks with the `user-top-read` permission; press `L` once to grant that permission after upgrading. Existing sign-ins fall back to local listening history and liked songs. Select an Explore/search song to play it, then Spotify Autoplay supplies suggestions when enabled in your account. Soloist exposes no autoplay toggle, so enable it in Spotify settings. Existing Spotify queue entries retain their usual priority.
+
+Liked songs and playlists continue from the selected row using a sequence owned by the Rust helper, including when the terminal is closed. `Ctrl-Right` / `n` skips forward and `Ctrl-Left` / `p` goes back (or restarts the current song after three seconds). Collection transitions can briefly buffer while Soloist changes context. A new selection replaces the local sequence; another Spotify controller can take over playback. A sequence accepts up to 5,000 playable tracks. `P` starts the native playlist context from its beginning. Search currently returns ten results.
+
+Press `i`, `?` or F1 for the full scrollable instructions. Arrow/page keys and the mouse wheel scroll the instructions, and Esc returns. Click a collection to open it, a song to play it, a saved search to rerun it or the progress bar to seek. The player buttons support clicks too. Hold Shift for your terminal's normal text selection.
+
+Search shows the last 30 distinct queries, stored locally with up to 100 played songs in the private state directory (`history.json`, mode 0600). Up/Down recalls queries; Ctrl-X clears search history; Ctrl-G clears only the input. Ctrl-arrows control playback while typing. Demo history never touches disk, and logout removes local history.
+
+## Linux media keys and MPRIS
+
+The player registers `org.mpris.MediaPlayer2.spotify_tui` on the session bus, independently of the tray. It works with `--no-tray` and continues after `q`. The desktop can use play/pause, next/previous, position, metadata, volume, shuffle and repeat. MPRIS is a Linux desktop integration; macOS does not gain media-key support in this release.
+
+```bash
+playerctl -p spotify_tui play-pause
+playerctl -p spotify_tui next
+playerctl -p spotify_tui previous
+playerctl -p spotify_tui position 30
+playerctl -p spotify_tui volume 0.5
+```
+
+`Q`, `stop`, logout and updates stop the media bridge. It needs the current user's D-Bus session and a paired local player. External controls report provider errors; a dispatched option change may still depend on the active Spotify context's available actions.
 
 ## Tests
 

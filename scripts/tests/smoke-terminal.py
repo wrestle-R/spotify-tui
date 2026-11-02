@@ -14,6 +14,8 @@ import termios
 import time
 
 binary=Path(sys.argv[1]).resolve()
+version=subprocess.check_output([str(binary),'--version'],text=True).strip().split()[-1]
+experience=tuple(map(int,version.split('.'))) >= (0,5,0)
 with tempfile.TemporaryDirectory(prefix='spotify-pty-') as temporary:
     env=dict(os.environ, HOME=temporary, TERM='xterm-256color')
     for key in ('XDG_CONFIG_HOME','XDG_DATA_HOME','XDG_CACHE_HOME','XDG_STATE_HOME','XDG_RUNTIME_DIR'):
@@ -33,6 +35,15 @@ with tempfile.TemporaryDirectory(prefix='spotify-pty-') as temporary:
         drain(.6)
         for keys in (b'\x1b[B',b'\r',b'\t',b'/sample',b'\x1b',b'?'):
             os.write(master,keys);drain(.1)
+        if experience:
+            os.write(master,b'\x1b');drain(.1)
+            for keys in (b'/Radiohead\r',b'/',b'\x1b[B',b'\r',b'/\x18',b'\x1b',b'i',b'\x1b[6~',b'\x1b[F'):
+                os.write(master,keys);drain(.15)
+            assert b'instructions' in output.lower(), 'instructions did not render'
+            assert b'RECENT SEARCHES' in output, 'search history did not render'
+            os.write(master,b'\x1b');drain(.1)
+            for keys in (b'\x1b[1;5C',b'\x1b[1;5D',b'\x1b[<0;45;6M',b'\x1b[<0;45;6m'):
+                os.write(master,keys);drain(.1)
         fcntl.ioctl(slave,termios.TIOCSWINSZ,struct.pack('HHHH',24,70,0,0))
         os.kill(process.pid,signal.SIGWINCH)
         drain(.15)

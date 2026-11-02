@@ -280,7 +280,11 @@ func (t *transport) action(method string, params any) *dbus.Error {
 func (t *transport) skip(method string) *dbus.Error {
 	t.s.actionMu.Lock()
 	defer t.s.actionMu.Unlock()
-	paused := t.s.snapshot().Status != "playing"
+	state := t.s.snapshot()
+	if !state.Connected || !state.LoggedIn || state.URI == "" {
+		return nil
+	}
+	paused := state.Status != "playing"
 	if err := t.s.call(method, nil); err != nil {
 		return err
 	}
@@ -306,6 +310,9 @@ func (t *transport) Stop() *dbus.Error {
 	t.s.mu.Lock()
 	t.s.stopped = true
 	t.s.mu.Unlock()
+	if t.s.conn != nil {
+		_ = t.s.conn.Emit(path, "org.freedesktop.DBus.Properties.PropertiesChanged", playerInterface, map[string]dbus.Variant{"PlaybackStatus": dbus.MakeVariant("Stopped")}, []string{})
+	}
 	return nil
 }
 func (t *transport) SeekOffset(offset int64) *dbus.Error {

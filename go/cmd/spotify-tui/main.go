@@ -25,7 +25,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "0.4.0"
+var version = "0.5.0"
 
 const helpText = `Spotify TUI (Go interface + Rust helper)
 

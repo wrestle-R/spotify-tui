@@ -9,7 +9,7 @@ import re
 import subprocess
 import tempfile
 
-REPO = 'wrestle-R/Spotify-Tui'
+REPO = 'wrestle-R/spotify-tui-rdp'
 ROOT = Path(__file__).resolve().parents[2]
 
 

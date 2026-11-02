@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-repository='wrestle-R/Spotify-Tui'
-version='0.4.0'
+repository='wrestle-R/spotify-tui-rdp'
+version='0.5.0'
 destination='./spotify-tui-linux'
 dry_run=false
 work_dir=''
