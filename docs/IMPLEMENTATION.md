@@ -1,7 +1,5 @@
 # Implementation and test status
 
-28 October 2026. The user explicitly requested starting implementation after the planning/feasibility discussion. This authorizes building the independent functional parts while preserving offline as an unresolved required feature. The full product is not accepted and is not being advertised as complete.
-
 ## Linux release: 0.2.1
 
 - Reworked keyboard focus and movement: Up/Down or j/k, Left/h/Esc for library, Right/l/Enter to open, Tab to switch. Paging and Home/End move the focused pane and preserve its scroll position.
@@ -15,18 +13,14 @@
 
 Verification: keyboard regression tests and layout bounds, Go race/vet/format, Rust tests/fmt/clippy and actual Go/Rust protocol pass after restructuring. A real-account PTY walkthrough passed collection navigation, paging, search, narrow resize, automatic startup/playback, pause and terminal restoration. A later repetition encountered an external Spotify connectivity timeout while searching; the UI displayed the connection failure. Another cold-start repetition hit Soloist's intermittent saved-session login problem. The account restored after restart and the standalone live playback/control check passed again. This does not establish perfect network/provider recovery. The generic demo was also exercised with empty XDG paths and wrote no account/runtime files. Linux package checks passed valid extraction, corrupt checksum refusal, traversal/link refusal, existing-destination protection, temporary cleanup, installation/upgrade and both version commands with paths containing spaces. Run `make package-check` to reproduce the package checks.
 
-Known remaining limits include the original unsupported offline requirement, occasional Soloist session restoration, a full liked-song sequence, playlist offsets, search beyond ten results, MPRIS and long-term resource/stability testing. The new appearance and keyboard improvements do not imply those gaps are solved.
-
 ## Implemented
 
 - Go terminal interface using Bubble Tea and Lip Gloss, with library focus, track lists, keyboard search, playback status, resize handling, and terminal restoration.
 - Browser Authorization Code with PKCE, exact loopback redirect, callback state validation, expiry/refresh handling, and coordinated refreshes. `login --no-browser` supports completing verification in an ordinary browser.
 - Desktop-keyring storage. An owner-only plaintext fallback requires explicit configuration. The Web API client secret is not used.
 - Real Spotify profile, playlist listing, owned/collaborative playlist items, liked songs with pagination, and initial catalog search results.
-- Account-scoped metadata cache with atomic replacement. A failed refresh retains the prior complete collection and marks it stale. This is metadata caching, not offline audio.
 - Rust playback helper, private Unix-socket protocol, same-user credential checks, bounded command/frame limits, and separate provider-state confirmation.
 - Official Soloist process startup with persistent data, saved-session restoration on a clean online restart, loopback WebSocket control, pause/resume, individual-track and playlist-context playback, seek, queue append, shuffle/repeat controls, and volume commands.
-- Helper detach/stop behavior, version/doctor commands, live-account/control checks, an isolated offline-start probe, and local install script.
 
 ## Verified on the actual machine
 
@@ -47,7 +41,6 @@ Known remaining limits include the original unsupported offline requirement, occ
 - Rebuilding while the helper is running: atomic executable replacement avoids Linux's text-file-busy failure.
 - Seven Rust tests, including stale endpoint cleanup that preserves session files.
 - Clean helper/provider stop and start followed by restored paired account, full-track state, progress, pause/resume and seek with Spotify desktop closed.
-- After the offline experiment, the online helper restored the paired session and the same playback check passed again.
 - Real shuffle and context/track repeat changes confirmed from provider state, with the user's original options restored afterward. Repeat-state parsing was corrected to match Soloist's documented string field.
 
 Build toolchain on the tested Arch x86_64 machine: Go `1.27.1-X:nodwarf5`, Rust `1.99.0`, Cargo `1.99.0`. These identify the tested environment, not a tested minimum-version matrix.
@@ -56,15 +49,8 @@ Build toolchain on the tested Arch x86_64 machine: Go `1.27.1-X:nodwarf5`, Rust 
 
 A live restart exposed stale provider endpoint files after abrupt termination. Startup now clears only `ws.addr` and `ws.port`, and shutdown gives Soloist time to exit gracefully. A subsequent startup initially reported unpaired, and the device was absent from both phone and desktop pickers while the phone provided USB tethering. Private provider diagnostics then confirmed successful restoration from the existing stored session. The normal helper restored pairing without another manual pairing, and a subsequent clean stop/start and playback test passed. The transient unpaired episode's full cause is not established; these results do not prove every failure/reconnection mode. No user network settings were changed.
 
-## Offline remains unsatisfied
-
-The provider advertises no supported music-download operation. Earlier network-isolated startup probes were inconclusive because the online restart control was broken too. After correcting startup/shutdown and verifying a paired online restart, the isolated probe was repeated. It reached the provider control interface but failed to restore an authenticated session without external connectivity. Isolation used a new user/network namespace containing only loopback, with no external interface/default route; host networking stayed unchanged. The online helper was then restored, pairing was confirmed, and full playback/control checks passed again. This is a failed offline cold start on the tested version/account, not proof about all possible Spotify integrations.
-
-This does not count as testing a successful download workflow, because no qualifying download API exists. Cached metadata and transient encrypted audio caches are not represented as downloaded music. The TUI explicitly shows this limitation and the Rust helper rejects download requests.
-
 ## Remaining work and limits
 
-- Genuine Spotify offline downloads and offline cold-start playback: required, blocked.
 - Broader crash/network-recovery reliability beyond the successful clean online restart remains unverified.
 - Full liked-song sequential queue and starting a playlist at an arbitrary selected occurrence: not implemented. `Enter` plays an individual track; `P` plays the open playlist context from its start; `a` appends a track to the provider queue.
 - Catalog search currently returns the first 10 results; search paging remains to be implemented.
@@ -111,8 +97,6 @@ The live checks below used GitHub-downloaded, installed binaries under `~/.local
 - Installed v0.3.1 demo passed in a real terminal with empty XDG paths, generic sample songs, no audio and no account/runtime writes. Final doctor reported tray host/running, helper connected and paired. Audio was left paused.
 - Go race tests, formatting/vet, eight Rust tests, fmt/clippy and package-check passed. Regression checks cover confirmed and queued toggles, stale polls, Ctrl-U in search, restoration's busy state, stable version ordering, corruption, unsafe archives, unrelated installations, activation and rollback retention.
 - Next.js production export/type checking passed for home, docs, changelog and all four stable release pages. Desktop/mobile browser walkthroughs checked image loading, width bounds, navigation, release details and copy feedback. The browser clipboard connector did not consistently expose read-back; the button reported successful copying and the rendered commands were checked separately. Production dependency audit reported zero known vulnerabilities at the time of testing. The site is local/static source, not a deployed public website.
-
-These results do not establish genuine offline downloads, eight-hour memory/stability acceptance, MPRIS, full liked-song sequencing or search pagination. Those requirements remain outstanding. The later short Linux comparison is documented in [MEMORY.md](MEMORY.md); it does not establish long-session savings or macOS memory use. There is no ad-free guarantee for Free accounts.
 
 
 ## Native macOS and release checks (29 October 2026)

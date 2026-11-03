@@ -56,7 +56,7 @@ jobs:
           make check
           cargo test --manifest-path rust/Cargo.toml --locked
       - name: Build native executable pair
-        run: make build VERSION=0.5.1
+        run: make build VERSION=0.5.2
       - name: Sign Apple Silicon executables for native execution
         if: runner.os == 'macOS'
         run: |
@@ -72,7 +72,7 @@ jobs:
         run: cd go && dbus-run-session -- env SPOTIFY_TUI_TEST_DBUS=1 go test -race -count=1 ./internal/mpris
       - name: Native archive, downloader and installer checks
         run: |
-          python3 scripts/release.py package --version 0.5.1
+          python3 scripts/release.py package --version 0.5.2
           python3 scripts/tests/test-release.py
       - name: Actual installed terminal walkthrough
         shell: bash

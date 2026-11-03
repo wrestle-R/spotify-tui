@@ -8,18 +8,18 @@ Go for the TUI, Rust for the local playback helper. **Linux x86_64 and Apple Sil
 
 Actual terminal capture of `--demo`, using generic sample playlists and songs. The demo produces no audio and reads no account data.
 
-[What's new](CHANGELOG.md) · [Full release details](docs/releases/v0.5.1.md)
+[What's new](CHANGELOG.md) · [Full release details](docs/releases/v0.5.2.md)
 
 ## Download
 
-**[Download for Linux x86_64](https://github.com/wrestle-R/spotify-tui-rdp/releases/download/v0.5.1/spotify-tui_0.5.1_linux_amd64.tar.gz)** · **[Download for Apple Silicon Mac](https://github.com/wrestle-R/spotify-tui-rdp/releases/download/v0.5.1/spotify-tui_0.5.1_darwin_arm64.tar.gz)** · [Release notes and checksums](https://github.com/wrestle-R/spotify-tui-rdp/releases/tag/v0.5.1)
+**[Download for Linux x86_64](https://github.com/wrestle-R/spotify-tui-rdp/releases/download/v0.5.2/spotify-tui_0.5.2_linux_amd64.tar.gz)** · **[Download for Apple Silicon Mac](https://github.com/wrestle-R/spotify-tui-rdp/releases/download/v0.5.2/spotify-tui_0.5.2_darwin_arm64.tar.gz)** · [Release notes and checksums](https://github.com/wrestle-R/spotify-tui-rdp/releases/tag/v0.5.2)
 
 The archive includes the TUI, Rust helper and local installer. Linux needs glibc 2.39+; Mac needs Apple Silicon and macOS 15+. Both need a Premium account and separate [Soloist setup](docs/SETUP.md#local-playback-through-official-soloist). Soloist comes from Spotify and isn't bundled here. macOS binaries are ad-hoc signed, not Apple-notarized.
 
 The repo and downloads are public:
 
 ```bash
-curl -fL https://github.com/wrestle-R/spotify-tui-rdp/releases/download/v0.5.1/download.py -o download.py
+curl -fL https://github.com/wrestle-R/spotify-tui-rdp/releases/download/v0.5.2/download.py -o download.py
 less download.py
 python3 download.py download --destination ./spotify-tui-download
 bash ./spotify-tui-download/install.sh

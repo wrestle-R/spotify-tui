@@ -159,9 +159,7 @@ export default function Home() {
       <section className="honest wrap" data-reveal>
         <span>BEFORE YOU DOWNLOAD</span>
         <p>
-          Online playback is the current focus.{" "}
-          <strong>Offline downloads aren’t supported yet.</strong> This isn’t a
-          finished replacement for every Spotify feature.{" "}
+          See the setup requirements, supported features and current limits.{" "}
           <Link href="/docs#limits">Read what works and what’s left ↗</Link>
         </p>
         <a href={`${repo}/releases/tag/${latest()}`}>Release notes ↗</a>

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repository='wrestle-R/spotify-tui-rdp'
-version='0.5.1'
+version='0.5.2'
 destination='./spotify-tui-linux'
 dry_run=false
 work_dir=''
@@ -14,7 +14,7 @@ while [[ $# -gt 0 ]]; do
     --destination) [[ $# -ge 2 && -n "$2" ]] || fail '--destination needs a directory'; destination=$2; shift 2 ;;
     --dry-run) dry_run=true; shift ;;
     --help|-h)
-      printf 'Download and verify the Linux x86_64 release. No install or execution.\nUsage: bash download-linux.sh [--version VERSION] [--destination NEW_DIRECTORY] [--dry-run]\nRequires curl, tar, sha256sum and GNU tools. Private repositories can use authenticated gh.\nTested on Arch Linux; Rust helper requires glibc 2.39 or later.\nSoloist and Spotify setup are separate. Offline downloads are unsupported.\n'
+      printf 'Download and verify the Linux x86_64 release. No install or execution.\nUsage: bash download-linux.sh [--version VERSION] [--destination NEW_DIRECTORY] [--dry-run]\nRequires curl, tar, sha256sum and GNU tools. Private repositories can use authenticated gh.\nTested on Arch Linux; Rust helper requires glibc 2.39 or later.\nSoloist and Spotify setup are separate.\n'
       exit 0 ;;
     *) fail "Unknown option: $1" ;;
   esac

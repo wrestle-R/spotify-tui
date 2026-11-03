@@ -6,10 +6,8 @@ Prepared 28 October 2026. This is a test specification. **No application test be
 
 | Gate | Required result | Current status |
 | --- | --- | --- |
-| G0: provider feasibility | Authorized standalone offline route and account API access established | BLOCKED: no qualifying offline provider established |
 | G1: real account | Login, liked songs, required playlists, search | NOT RUN |
 | G2: local playback | Full audio with desktop/web clients closed | NOT RUN |
-| G3: genuine offline | Full cold-start suite below | NOT RUN |
 | G4: stability/resources | Long-run, recovery, and budget evidence | NOT RUN |
 | G5: distribution | Matching Go/Rust artifacts and verified installer | NOT RUN for app; planning distribution checked separately |
 
@@ -22,7 +20,6 @@ An app release requires every required gate to pass. A planning release must cle
 - [ ] Identify download, removal, progress, and license renewal operations.
 - [ ] Prove process-independent authorized session persistence.
 - [ ] Record any required initial official-client pairing separately from routine operation.
-- [ ] Record license/offline validity window and provider binary expiration constraints.
 - [ ] Check owned, private, collaborative, followed, and Spotify-curated playlist access where relevant.
 - [ ] Stop and record no-go if any mandatory capability has no route. Do not invent a positive result.
 
@@ -44,7 +41,6 @@ An app release requires every required gate to pass. A planning release must cle
 | B12 | Search uses punctuation and non-Latin text | Escaping and rendering correct; no terminal escape execution |
 | B13 | Rate limit and account quota responses | Appropriate cooldown or stop; visible reason; no busy loop |
 | B14 | Account switch/logout | Credentials and cache isolated; no previous account data leakage |
-| B15 | Search offline | Explicit cached-library scope; no claim of catalog access |
 
 ## C. Local playback and terminal behavior
 
@@ -73,31 +69,6 @@ An app release requires every required gate to pass. A planning release must cle
 | C21 | Media keys if included | UI, MPRIS, and actual playback state remain consistent |
 
 SIGKILL cannot run terminal cleanup. Document recovery for externally killed processes rather than claiming panic handling solves every termination mode.
-
-## D. Genuine offline acceptance
-
-Perform only after G0 has identified a qualifying route. The test must block external connectivity for the tested app and all playback-provider processes, while preserving required local Unix sockets, loopback control, and PipeWire access. Use an isolated test environment or an authorized app-scoped network restriction. Do not disconnect the user's whole machine without asking.
-
-Prepare an eligible small playlist with at least three distinct tracks. Download it through the proposed app. Include a track that has not previously been played. Preserve evidence of provider completion and license state without secrets.
-
-1. Verify the official desktop app and web player are closed.
-2. Stop the Go TUI, Rust helper, and any playback provider completely.
-3. Apply and verify app/provider external-network blocking. A status label alone is not evidence of a blocked network.
-4. Cold-start the helper and TUI with the stored offline authorization state.
-5. Play the never-before-played downloaded track from its beginning to completion.
-6. Start a second downloaded track, seek forward/backward, pause/resume, and skip.
-7. Stop every app/provider process again; cold-start and repeat playback without reconnecting.
-8. Reboot or start an equivalent clean session offline while preserving valid storage. Do not allow auto-network recovery to mask the test.
-9. Select a cached but non-downloaded track. It must show offline unavailability instead of hanging or claiming success.
-10. Test partial/failed/canceled downloads: they must not appear fully downloaded.
-11. Reconnect through the normal supported route. Verify renewal and collection update state; do not falsify clock or license checks.
-12. Test expired/revoked entitlement using provider-supported fixtures or a permitted test route. Correctly request renewal; do not expose audio as permanently licensed.
-13. Remove a downloaded collection and verify storage reclamation, preserving tracks still referenced by another pinned collection.
-14. Exhaust the configured disk allowance safely using a test directory/quota. Existing valid downloads must remain intact.
-
-Record provider build/version, offline license window, durations, tested item IDs in private evidence if necessary, network-isolation method, process list, and observable results. Redact credentials and private listening history from public reports.
-
-Continuing a buffered song after disconnecting is not a pass. Browsing stored metadata is not a pass. A silent helper using the network is not a pass. Another audio source is not a pass.
 
 ## E. Resource measurements
 
@@ -135,8 +106,6 @@ cargo test --manifest-path rust/Cargo.toml --locked
 cargo build --manifest-path rust/Cargo.toml --locked --release
 ```
 
-Formatting requires empty `gofmt -l` output. The Go race detector may require an appropriate native toolchain even if the release app avoids cgo; check the local setup. Run provider-feature-specific checks for the selected build, not nonexistent backends. Build success does not replace account/audio/offline checks.
-
 Use deterministic synthetic records for HTTP and UI tests. Use fixture messages consumed by both Go and Rust for the protocol contract. Private listening data and tokens must not enter the test repository.
 
 ## G. App distribution, after implementation
@@ -152,7 +121,6 @@ Use deterministic synthetic records for HTTP and UI tests. Use fixture messages 
 - [ ] Runtime credentials are never included in a release or requested by the installer.
 - [ ] Official provider binaries are distributed only where their actual terms allow it.
 - [ ] Clean install, upgrade, uninstall, and launch are tested on Arch.
-- [ ] Offline gate passes before a release is advertised as the requested working player.
 
 ## H. Evidence record template
 

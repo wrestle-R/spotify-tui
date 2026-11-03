@@ -107,4 +107,4 @@ mv -T --no-clobber -- "$work_dir/unpacked" "$destination"
 
 printf '\nVerified planning documents saved to: %s\n' "$destination"
 printf 'Read %s/PLAN.md to start.\n' "$destination"
-printf 'This is a planning release, not a working music player. Offline playback remains a feasibility gate.\n'
+printf 'This is a planning release, not a working music player.\n'

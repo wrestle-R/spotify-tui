@@ -1,11 +1,8 @@
 # Linux and Apple Silicon Mac downloads
 
-For v0.5.1, use the native platform downloads and portable Python downloader in [the release guide](releases/v0.5.1.md). See [Mac requirements](MACOS.md). Both archives contain an installer and matching Go/Rust binaries. Python 3.9+ is required for installation only; macOS builds are ad-hoc signed, not notarized.
+For v0.5.2, use the native platform downloads and portable Python downloader in [the release guide](releases/v0.5.2.md). See [Mac requirements](MACOS.md). Both archives contain an installer and matching Go/Rust binaries. Python 3.9+ is required for installation only; macOS builds are ad-hoc signed, not notarized.
 
 ## Older Linux-only download path
-
-
-The repository is public. Download the stable Linux x86_64 archive from [GitHub Releases](https://github.com/wrestle-R/Spotify-Tui/releases/latest). It needs glibc 2.39+, libgcc_s and separate Spotify/Soloist setup. Offline downloads are unsupported.
 
 ```bash
 curl -fL https://github.com/wrestle-R/Spotify-Tui/releases/download/v0.3.1/download-linux.sh -o download-linux.sh

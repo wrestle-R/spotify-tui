@@ -4,13 +4,9 @@ Prepared: 28 October 2026, Asia/Calcutta.
 
 Project directory: `/home/rdp/Desktop/code/Spotify-Tui`.
 
-Status: planning complete; initial Go/Rust implementation started after the user's subsequent explicit request. Standalone Spotify offline downloads remain an unresolved external dependency and a full-product release blocker. See docs/IMPLEMENTATION.md for current code and test status. Earlier instructions to stop before all product code have been superseded by that start request; the offline requirement has not been removed.
-
 ## 1. What we are making
 
 A small terminal music player for Arch Linux. Open it, find a song or playlist, press Enter, and listen through this computer. Spotify's desktop app should be fully closed. The interface stays simple: a library on the left, a song list on the right, and playback information at the bottom.
-
-The user confirmed Spotify Premium, Arch Linux, playlists, liked songs, search, standalone playback, and mandatory offline downloads. The latest technology instruction is Go for the TUI and Rust alongside it. This plan assigns Rust to the playback helper. The earlier graphical desktop concepts were rejected; they are not the design direction.
 
 Lower memory use is the reason for the project. Neither the existing Spotify footprint nor a replacement's memory use has been measured. Performance numbers below are proposed engineering targets, not claims about a built app.
 
@@ -20,21 +16,11 @@ The app does not need AI, chat, voice commands, album-art rendering, recommendat
 
 **Do not mistake a detailed plan for proof that every requirement is currently achievable.**
 
-The terminal interface and streaming playback have plausible implementation paths. The required offline feature does not currently have a verified path through the tools reviewed. A smaller interface cannot supply an offline capability that the underlying playback service does not expose.
-
 Current findings, with primary links in [SOURCES.md](docs/SOURCES.md):
 
-| Candidate | What it could do | Offline finding | Planning decision |
 | --- | --- | --- | --- |
-| Spotify Soloist | Official headless local playback and a local control API | Reviewed features and command/API references do not establish a download-and-offline facility | Evaluate as an official streaming candidate, not as an offline solution |
-| Rust librespot | Community Spotify Connect playback engine | Maintainer states encrypted caching requires network access for decryption | Cannot satisfy the mandatory offline gate as currently documented |
-| Spotify browser SDK | Browser-based streaming | No offline download controls in the reviewed reference | Poor fit for this terminal project |
 | Spotify desktop app controlled by a TUI | Could retain the official player's capabilities | Requires the official player | Fails the explicit replacement requirement |
 | Locally owned audio files | Could support genuine local playback | Does not download the user's Spotify catalog | A different scope, not an automatic substitute |
-
-The current full-product decision is **no-go pending an authorized, documented offline playback route**. Do not start a large online-only build and quietly move downloads to a future release. The user explicitly said offline is required.
-
-The first future implementation session should produce a short feasibility record. If no qualifying provider exists, preserve this plan, record the blocker, and ask whether the user wants to change scope. Do not mark the project complete, invent a download endpoint, read Spotify's private offline storage, substitute another music service, or treat a playback cache as a downloaded library.
 
 The remaining architecture is a conditional build specification. It becomes executable project work only after the gate passes or the user explicitly changes the requirement.
 
@@ -46,7 +32,6 @@ All of these must be true for full acceptance:
 2. The user's liked songs and required playlists are accessible, including all pages of results.
 3. Catalog search can find a track and start its full Spotify audio on this computer.
 4. The official desktop app and web player remain closed throughout normal playback.
-5. The player can save an eligible collection for genuine offline use through the chosen provider.
 6. After all player processes are stopped, the app can cold-start without external connectivity and play downloaded tracks, including one that was not previously played.
 7. Playback controls, navigation, errors, and terminal restoration work on Arch Linux.
 8. Memory and CPU measurements meet the agreed budget over extended use.
@@ -65,7 +50,6 @@ Mock data, a rendered TUI, successful compilation, or a streaming demo alone doe
 | R05 | Playlists | Required | User-owned, collaborative, and required followed playlists checked separately |
 | R06 | Search | Required | Track search plus playback, with paging and failure handling |
 | R07 | Standalone local audio | Required | Desktop/web clients closed; sound from this machine |
-| R08 | Offline download and cold-start playback | Required | Full offline gate and offline acceptance suite |
 | R09 | Lower sustained memory use | Required | Compare measured whole-player footprint with Spotify baseline |
 | R10 | Keyboard navigation | Required | Vim-style and arrow keys; no mouse dependency |
 | R11 | Pause, previous, next, seek, volume | Required | Real audio state matches displayed state |
@@ -87,22 +71,6 @@ Future preflight records: Go version, Rust/Cargo version, chosen terminal, PipeW
 
 Measure the existing Spotify application under a repeatable workload before replacing it. Do not assume the user's rough “a lot” report gives a usable baseline.
 
-### 5.2 Resolve offline support
-
-A qualifying route needs all of the following:
-
-- Current provider documentation or explicit provider authorization for offline storage and playback in this integration.
-- Eligibility for this user's account and a personal Arch Linux application.
-- Full-track playback, not previews, buffered remainder playback, or a different audio source.
-- Download enumeration, progress, completion, cancellation, removal, and storage accounting.
-- Persistent authorized playback state that survives process shutdown and a network-free restart.
-- Defined subscription/license renewal behavior and an offline validity window.
-- A way to control the provider from our Rust helper without keeping the desktop app open.
-
-Read current Soloist documentation for any newly introduced facility; absence of a documented feature is not proof that all future Spotify integrations are impossible. If nothing new is documented, the gate fails. The reviewed librespot maintainer statement is already evidence against using its cache for this requirement.
-
-Do not spend an open-ended implementation effort rediscovering a documented limitation. A bounded research pass should end in a written go/no-go decision, with sources and unanswered questions. No delivery date for the complete app is credible until this gate passes.
-
 ### 5.3 Check library access as its own gate
 
 Spotify's current playlist-items reference limits access to playlists the user owns or collaborates on. Merely following a playlist is a distinct case. New API restrictions can therefore affect “my playlists” even when login succeeds. [Playlist-items reference](https://developer.spotify.com/documentation/web-api/reference/get-playlists-items).
@@ -110,10 +78,6 @@ Spotify's current playlist-items reference limits access to playlists the user o
 Check at least one owned playlist, one private playlist, one collaborative playlist if available, one followed playlist if used, and one Spotify-curated playlist if used. Record which real requirements work with the account and app mode. Do not promise access to every playlist merely because `/me/playlists` returns its name.
 
 ### 5.4 Feasibility deliverables
-
-After implementation is authorized, create `docs/FEASIBILITY.md` containing provider/version, dated sources, supported capabilities, account-mode findings, offline cold-start results, remaining constraints, and a clear decision. This file is not fabricated in the planning session: no account or playback tests have occurred yet.
-
-Proceed only if mandatory capabilities pass. If the gate fails, present concrete alternatives for the user to choose: retain official Spotify for offline use, accept streaming-only TUI scope, or adopt a local-file player scope. None is approved by this plan.
 
 ## 6. Technology choices
 
@@ -139,25 +103,7 @@ SQLite driver selection happens during dependency review. Prefer a driver that p
 
 ## 7. Runtime architecture
 
-```text
-Terminal keyboard
-      |
-      v
-Go TUI: navigation, OAuth, Spotify metadata, library database
-      |
-      | Unix socket: commands, responses, state events
-      v
-Rust playback helper: sessions, queue coordination, provider lifecycle
-      |
-      v
-Qualified playback provider -> PipeWire -> selected system output
-      |
-      +-> Provider-managed authorized offline storage, only if verified
-```
-
 The Go process never receives decoded audio or an entire audio download. The Rust helper never renders terminal views. Metadata traffic and playback traffic have separate failure states.
-
-The provider adapter exposes a small capability set: local playback, seek, queue control, persistent session, downloads, offline start, and license refresh. A capability is false until demonstrated. `downloads=false` is a full-product blocker, not a detail to hide in configuration.
 
 Start with one provider after Phase 0. Do not build a plugin marketplace or several production adapters. If Soloist is selected, Rust supervises the official binary and translates its local events; this does not make the official binary Rust code. If librespot is selected after an explicitly approved streaming-only scope change, Rust embeds or controls it using a pinned supported release.
 
@@ -171,11 +117,7 @@ Its stored Connect session and API key are separate from the Go app's Web API au
 
 Its local WebSocket interface has no built-in authentication or browser-origin protection. If used, bind it to loopback, avoid an exposed LAN listener, verify actual readiness, and document the residual local-process/browser threat rather than calling loopback an authentication mechanism. A failed listener may leave the provider running without a usable control API, so PID existence is not a readiness check. [WebSocket reference](https://developer.spotify.com/documentation/soloist/reference/websocket-api), [CLI reference](https://developer.spotify.com/documentation/soloist/reference/command-line).
 
-Do not confuse downloading the Soloist executable with downloading music. Do not treat its `cache-dir` setting as an offline feature. Its binary expiration and future license behavior would also need to fit the offline acceptance window.
-
 ### Librespot candidate
-
-Librespot is a Rust community playback project, useful for evaluating a terminal streaming engine. It is not an official Spotify SDK. Its maintainers explicitly distinguish encrypted caching from offline playback. It is not the offline implementation for this plan. [Project](https://github.com/librespot-org/librespot), [maintainer discussion](https://github.com/librespot-org/librespot/discussions/610).
 
 Do not extract credentials or client identities from the official desktop app to work around provider restrictions. Account authentication changes are a provider compatibility issue to diagnose, not something this plan can wish away.
 
@@ -264,8 +206,6 @@ Later changes matter too: July 2026 increased app limits and moved development q
 
 Use a bounded in-flight request budget, a sensible timeout, and cancellation when changing views. On 429 respect `Retry-After` where present, retain a cooldown, and show it. If an account quota is exhausted, stop background retrying and explain the condition. Retry safe reads on transient failures with capped backoff; do not spin forever. [Rate limits](https://developer.spotify.com/documentation/web-api/concepts/rate-limits).
 
-Submit catalog searches with Enter by default, avoiding an API request for every keystroke. Tag each request with the current query/view generation; discard results arriving after the user switches context. Offline search only searches cached metadata and must be labeled as such. It cannot discover songs that have never been fetched.
-
 ## 12. State and storage
 
 Use XDG locations, keeping runtime data outside the source checkout:
@@ -277,7 +217,6 @@ Use XDG locations, keeping runtime data outside the source checkout:
 | Logs/state | `$XDG_STATE_HOME/spotify-tui/` | Each process, separate files |
 | Socket and lock | `$XDG_RUNTIME_DIR/spotify-tui/` | Rust |
 | Playback session | Provider-specific private directory | Provider through Rust |
-| Authorized offline media | Provider-managed bounded storage | Qualified provider only |
 | Temporary playback cache | `$XDG_CACHE_HOME/spotify-tui/` | Provider through Rust |
 
 Use standard XDG defaults when variables are unset. Validate runtime-directory ownership and permissions; do not place an unauthenticated socket at a predictable world-writable path. If there is no suitable runtime directory, use a private per-user directory and clearly document its lifecycle.
@@ -288,8 +227,6 @@ Keep UI selection state in a small local state file. Do not store credentials in
 
 Fetch pages incrementally and render visible rows. Bound in-memory track pages, database page cache, logs, response sizes, and background work. A tentative first budget is 8 recently viewed track pages of up to 100 records; validate it against actual endpoint limits and memory profiling. A full metadata collection may live on disk without residing in both Go and Rust memory.
 
-Refresh collections into a new generation and swap atomically only when that refresh is coherent. A failed second page must not replace a valid 500-song collection with 50 songs. Keep a staleness marker and explicit refresh controls. Cache retention must follow the provider's current terms and deletion requirements; do not advertise indefinite offline metadata retention without review.
-
 ## 13. Local Go/Rust protocol
 
 Use newline-delimited JSON over a Unix-domain socket, with `0600` socket permissions inside a `0700` directory and same-user peer validation where supported. Keep the wire contract versioned independently from app release versions. No HTTP server or LAN port is needed for our own IPC.
@@ -299,8 +236,6 @@ Each command has protocol version, request ID, method, and params. Each response
 Proposed commands: `hello`, `capabilities`, `state`, `play_collection`, `play_track`, `pause`, `resume`, `next`, `previous`, `seek`, `set_volume`, `set_shuffle`, `set_repeat`, `downloads_list`, `download_start`, `download_cancel`, `download_remove`, and `shutdown`.
 
 These are our future helper methods, not claims about existing Spotify endpoints. Unsupported download commands return `UnsupportedCapability` and cannot satisfy release acceptance.
-
-Proposed events: `PlaybackChanged`, `TrackChanged`, `PositionChanged`, `VolumeChanged`, `ProviderStatusChanged`, `DownloadChanged`, and `RecoverableError`. Error categories include unauthorized, subscription required, offline unavailable, unsupported capability, not playable, provider unavailable, expired provider build, storage full, rate limited, and incompatible protocol.
 
 Bound individual messages to 256 KiB initially and reject oversize frames. Do not send entire libraries over this socket: Go resolves metadata and supplies a bounded queue window or a provider collection URI. Large providers' queue limits require explicit handling, not truncated collections. Use timeouts, preserve unknown-outcome mutation errors, and define whether a request can be retried. Include cross-language golden fixtures for messages and errors.
 
@@ -317,24 +252,6 @@ Unsupported tracks show a reason where available. Avoid an endless skip loop whe
 Use the current system output by default. Test speakers, headphones, output changes, Bluetooth loss, PipeWire restart, and suspend/resume. Do not change the user's global volume, default sink, or audio configuration during setup.
 
 Proposed background policy: `q` detaches the TUI, `Q` stops audio and exits, and a future explicit `stop` command terminates this project's helper. Tell the user what happened. No automatic systemd service or autostart entry in the first version. If the UI crashes, restore its terminal on the next safe opportunity and leave helper behavior deterministic. If the helper crashes, show it and reconnect only with bounded retries; do not create an infinite restart loop.
-
-## 15. Offline download design, conditional on a provider
-
-This section specifies required behavior, not an implementation route that has already been found.
-
-The provider must distinguish: not requested, queued, downloading, complete and currently licensed, partial, failed, expired, and removed. Only provider-verified complete/license-valid entries show as playable offline. A file's existence, a cached title, or a finished progress animation is insufficient evidence.
-
-Request a track or collection through the provider's supported operation. Track progress and errors, permit cancellation, persist provider-owned state, and resume only when the provider supports it. A collection with failures displays partial completion and item counts. It must not appear wholly downloaded.
-
-Default storage proposal: a configurable finite budget, initially 5 GiB if the available disk and provider permit it. Show estimated size when available, free-space failures, and removal effects. Never evict intentionally downloaded collections just to grow a temporary playback cache. Removing one collection does not delete a shared track still pinned by another collection.
-
-Keep downloaded-collection membership separate from its latest online version. If the online playlist changes, show that an update is available; complete an authorized sync before replacing a usable offline copy. Handle unavailable items without silently replacing them with unrelated recordings.
-
-License/subscription state belongs to the provider. Report renewal requirements accurately. Do not promise unlimited offline duration, skip online renewal, change the machine clock, or store decryption keys independently. A cold start must not require a fresh network request within the provider's advertised offline-valid period.
-
-Search offline is limited to the retained library. Non-downloaded tracks remain visible if cached, clearly marked unavailable for offline playback. Reconnecting refreshes capability/license state before resuming queued work. Download deletion is explicit, account-scoped, and recoverable where the provider supports it.
-
-If no provider can implement these requirements, keep Downloads as a design requirement in documentation and stop the full build at Phase 0. Do not ship a decorative Downloads screen.
 
 ## 16. Resource budgets and measurement
 
@@ -363,16 +280,12 @@ Avoid continuous rendering while idle. Use event-driven updates and at most a mo
 
 | Phase | Work | Exit condition |
 | --- | --- | --- |
-| 0 | Provider/offline research, real account access checks, baseline | Mandatory capabilities proven or written no-go |
 | 1 | Pin toolchains/dependencies, choose licenses, define protocol and fixtures | Small Go/Rust IPC round trip with clean shutdown |
 | 2 | Login, account namespace, bounded metadata client | Real liked songs, playlist access matrix, and refresh pass |
 | 3 | Rust provider adapter and local audio | Full tracks with official clients closed; restart pass |
 | 4 | Go TUI with real data and controls | Keyboard, resize, Unicode, and async race checks pass |
-| 5 | Offline workflow and storage | Download plus network-free cold-start suite passes |
 | 6 | Recovery, long-run profiling, media keys if included | Stability and resource checks pass on Arch |
 | 7 | Packaging and final handoff | Clean install, upgrade, uninstall, and user walkthrough pass |
-
-Phase 0 may end the implementation effort before Phase 1. Later phases are not permission to bypass that stop condition. Engineering test fixtures can explore components after authorization, but a polished online product is not the promised outcome while offline remains impossible.
 
 Within each phase, deliver a small working slice and record evidence before expanding it. Fix blocking behavior rather than adding screens. Do not give a calendar commitment for phases 1–7 until Phase 0 is positive; research results are not a schedule guarantee.
 
@@ -381,8 +294,6 @@ Within each phase, deliver a small working slice and record evidence before expa
 Use focused automated tests for failure-prone behavior: OAuth callback validation, refresh coordination, pagination consistency, playlist occurrence preservation, delayed-search results, IPC framing/versioning, queue transitions, download state interpretation, and terminal restoration. Do not write tests merely to assert that getters return constants.
 
 Go tests include reducer/input behavior, HTTP fixtures, socket disconnects, and text layout at common sizes. Rust tests include provider-adapter behavior, state/event sequences, bounded queues, framing, and shutdown. Cross-language fixtures must be consumed by both suites, including malformed and oversize messages.
-
-Live tests use the user's account only after implementation authorization and login. No secrets in recorded fixtures. Record dated manual evidence for audio output, official-client independence, keyring behavior, offline cold starts, Bluetooth/output changes, suspend, and memory runs. A mock backend is useful for reliability checks but cannot prove Spotify entitlement or offline support.
 
 Planned quality gates include Go formatting/tests/vet/race checks and Rust formatting/tests/clippy/locked release build. Exact commands and run conditions are specified in [ACCEPTANCE.md](docs/ACCEPTANCE.md). No such build checks have run during planning because no application code exists.
 
@@ -395,7 +306,6 @@ Planned quality gates include Go formatting/tests/vet/race checks and Rust forma
 | Token revoked | Request reauthorization; avoid infinite refresh |
 | Playlist forbidden | Explain ownership/collaboration restriction; do not show empty success |
 | HTTP 429 | Respect cooldown; distinguish account quota when supplied |
-| Network lost | Show connectivity state; retain cached browsing and valid offline playback |
 | Track unavailable | Mark reason and avoid endless automatic skipping |
 | Provider missing | Give exact missing component and setup step |
 | Provider expired | Explain update requirement without deleting credentials |
@@ -451,8 +361,6 @@ If Soloist is chosen, link to official downloads and let the user obtain it; do 
 
 The user subsequently authorized creating a GitHub repository and a download script. This planning handoff therefore includes a private repository, an initial documentation commit, and a planning release with a verified-download script. No system service, global audio reconfiguration, Spotify account-login browser session, package installation, or application implementation is included. A later build request still cannot make missing provider capabilities exist.
 
-The original planning download remains documentation-only. A subsequent explicit request for a Linux app download authorized a regular Linux release. See [DOWNLOADS.md](docs/DOWNLOADS.md) for the binary bundle and checksum-verifying downloader. The complete-product release remains gated on playback/offline acceptance.
-
 ## 22. Local notes and environment-file workflow
 
 The project folder was not a Git repository when first checked. After the user's repository request, a Git repository was initialized here and a private GitHub repository was created at `wrestle-R/Spotify-Tui`. The root `.gitignore` contains `/local-docs/` before local memory notes are created. Those notes are excluded from commits, release archives, and uploads.
@@ -463,24 +371,15 @@ No `.env` file is needed for this plan, and none has been created. Prefer non-se
 
 ## 23. Decisions, assumptions, and remaining questions
 
-Confirmed: Arch Linux; Spotify Premium; simple TUI; Go and Rust; playlists, liked songs, search; standalone audio; offline required; lower RAM motivation; detailed planning now rather than implementation.
-
 Proposed defaults: Rust owns playback/helper work, Go owns library/auth/UI; `q` detaches; `Q` stops; no autostart; read-only library; submit-to-search; finite disk cache; MPRIS after core verification. These may be adjusted without changing the confirmed product requirements.
 
 Unanswered details to resolve when they matter:
 
 - Which followed or Spotify-curated playlists must be playable? This affects API feasibility.
-- How much music should be available offline, and for how long between connections?
 - Is initial one-time pairing through an official mobile client acceptable if subsequent use is independent?
 - Should closing the TUI continue audio, or stop it? This plan proposes explicit detach/stop keys.
 - Which terminal should be used for final acceptance and what numeric memory budget is acceptable?
 
-None of these requires another design mockup before the offline gate. Do not ask the user to repeat confirmed answers.
-
 ## 24. What exists after this planning session
 
 Delivered: this plan, README, acceptance checklist, dated source ledger, download guide, future release workflow specification, the simple terminal reference image, an actual planning-bundle download script, and ignored local continuation notes. The repository and planning release provide a downloadable handoff. Planning-distribution verification is separate from application verification.
-
-Not verified: Spotify login, Web API calls with this account, library completeness, local streaming, provider startup, downloads, offline playback, actual memory/CPU savings, or a compiled Go/Rust app.
-
-The first useful next action, after implementation is requested, is to resolve and document the offline/provider feasibility gate. If that gate remains negative, say so clearly before spending time on a full player.

@@ -495,7 +495,7 @@ dependencies = [
 
 [[package]]
 name = "spotify-tui-playback"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "fs2",
  "futures-util",

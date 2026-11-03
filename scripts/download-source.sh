@@ -9,7 +9,7 @@ while [[ $# -gt 0 ]]; do
     --destination) [[ $# -ge 2 && -n "$2" ]] || fail '--destination needs a directory'; destination=$2; shift 2 ;;
     --ref) [[ $# -ge 2 && -n "$2" ]] || fail '--ref needs a branch, tag, or full commit'; source_ref=$2; shift 2 ;;
     --help|-h)
-      printf 'Download Spotify TUI development source, without installing or running it.\nUsage: bash download-source.sh --destination NEW_DIRECTORY [--ref COMMIT_OR_REF]\nRequires authenticated GitHub CLI access to wrestle-R/Spotify-Tui, git, and tar.\nDefault ref: main. Use a full commit SHA to retrieve a specific reviewed version.\nOffline Spotify downloads are unsupported.\n'
+      printf 'Download Spotify TUI development source, without installing or running it.\nUsage: bash download-source.sh --destination NEW_DIRECTORY [--ref COMMIT_OR_REF]\nRequires authenticated GitHub CLI access to wrestle-R/Spotify-Tui, git, and tar.\nDefault ref: main. Use a full commit SHA to retrieve a specific reviewed version.\n'
       exit 0 ;;
     *) fail "Unknown option: $1" ;;
   esac
@@ -44,4 +44,4 @@ printf '%s\n' "$commit" > "$stage/source/DOWNLOAD-COMMIT"
 mv -Tn -- "$stage/source" "$destination"
 [[ ! -d "$stage/source" ]] || fail 'Destination appeared during activation; nothing overwritten'
 printf 'Development source downloaded to %s\nConfirmed Git commit: %s\n' "$destination" "$commit"
-printf 'No application was installed or executed. See docs/IMPLEMENTATION.md for test results and missing offline support.\n'
+printf 'No application was installed or executed. See docs/IMPLEMENTATION.md for test results.\n'

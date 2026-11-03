@@ -158,8 +158,6 @@ func (m Model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			mode = "off"
 		}
 		return m.with(m.perform("Repeat "+mode, playerCommand{"repeat_track", map[string]any{"enabled": false}}, playerCommand{"repeat_context", map[string]any{"enabled": mode == "context"}}, playerCommand{"repeat_track", map[string]any{"enabled": mode == "track"}}))
-	case "d", "D":
-		m.showDownloads()
 	case "R", "ctrl+r":
 		return m.with(m.refresh())
 	case "L":

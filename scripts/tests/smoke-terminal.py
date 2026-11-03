@@ -40,7 +40,7 @@ with tempfile.TemporaryDirectory(prefix='spotify-pty-') as temporary:
             os.write(master,b'\x1b');drain(.1)
             for keys in (b'/Radiohead\r',b'/',b'\x1b[B',b'\r',b'/\x18',b'\x1b',b'i',b'\x1b[6~',b'\x1b[F'):
                 os.write(master,keys);drain(.15)
-            assert b'instructions' in output.lower(), 'instructions did not render'
+            assert b'instructions' in output.lower() or b'shortcuts' in output.lower(), 'shortcut overlay did not render'
             assert b'RECENT SEARCHES' in output, 'search history did not render'
             os.write(master,b'\x1b');drain(.1)
             for keys in (b'\x1b[1;5C',b'\x1b[1;5D',b'\x1b[<0;45;6M',b'\x1b[<0;45;6m'):
@@ -48,7 +48,7 @@ with tempfile.TemporaryDirectory(prefix='spotify-pty-') as temporary:
         if hold:
             os.write(master,b'\x1b[?31u');drain(.1)
             os.write(master,b'\x1b[105;1:1u');drain(.2)
-            assert b'Release to close' in output, 'held instructions did not open'
+            assert b'release to close' in output.lower(), 'held instructions did not open'
             os.write(master,b'\x1b[105;1:2u');drain(.1)
             os.write(master,b'\x1b[105;1:3u');drain(.2)
         fcntl.ioctl(slave,termios.TIOCSWINSZ,struct.pack('HHHH',24,70,0,0))

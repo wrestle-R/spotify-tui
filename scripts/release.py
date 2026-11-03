@@ -16,7 +16,7 @@ import tarfile
 import tempfile
 import urllib.request
 
-VERSION = "0.5.1"
+VERSION = "0.5.2"
 REPOSITORY = "wrestle-R/spotify-tui-rdp"
 BINARIES = ("spotify-tui", "spotify-tui-playback")
 LIMIT = 128 * 1024 * 1024
@@ -33,7 +33,7 @@ def target():
 
 def valid_version(version):
     if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
-        raise ValueError("Expected a stable version such as 0.5.1")
+        raise ValueError("Expected a stable version such as 0.5.2")
     return version
 
 
@@ -85,10 +85,10 @@ def package(version, project):
         commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=project, text=True).strip()
         runtime = {"version": version, "target": target(), "commit": commit,
                    "provider": "Download the matching official Spotify Soloist separately; never bundled",
-                   "tray": "Linux StatusNotifier only", "offline_downloads": False,
+                   "tray": "Linux StatusNotifier only",
                    "macos_signing": "ad-hoc signed, not Developer ID signed or notarized" if target().startswith("darwin") else None}
         (root / "RUNTIME.json").write_text(json.dumps(runtime, indent=2) + "\n")
-        (root / "RUNTIME.txt").write_text("Linux requires glibc >=2.39; macOS release requires Apple Silicon and macOS 15 or later.\nPython 3.9+ is required for the installer/downloader only.\nSoloist, Spotify Premium and account setup are separate. Offline downloads unsupported.\nMac tray unavailable. macOS binaries are ad-hoc signed, not notarized.\n")
+        (root / "RUNTIME.txt").write_text("Linux requires glibc >=2.39; macOS release requires Apple Silicon and macOS 15 or later.\nPython 3.9+ is required for the installer/downloader only.\nSoloist, Spotify Premium and account setup are separate.\nMac tray unavailable. macOS binaries are ad-hoc signed, not notarized.\n")
         archive = release / (name + ".tar.gz")
         with tarfile.open(archive, "w:gz") as output:
             output.add(root, arcname=name)

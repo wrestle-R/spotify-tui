@@ -31,7 +31,7 @@ func fit(s string, width int) string {
 	return s + strings.Repeat(" ", max(0, width-lipgloss.Width(s)))
 }
 func plainFit(s string, width int) string { return fit(spotify.Clean(s), width) }
-func (m Model) bodyRows() int             { return max(1, m.height-11) }
+func (m Model) bodyRows() int             { return max(1, m.height-10) }
 func (m *Model) ensureVisible() {
 	size := m.bodyRows()
 	m.selected = max(0, min(m.selected, max(0, len(m.tracks)-1)))
@@ -81,6 +81,9 @@ func (m Model) View() string {
 	}
 	heading := active.Render(" spotify tui ") + muted.Render(" / ") + bright.Render("your playlists, in the terminal")
 	badge := m.playerLabel()
+	if m.latest != nil {
+		badge += " · " + m.latest.Tag + " available"
+	}
 	if m.demo {
 		badge = "demo · no audio"
 	}
@@ -215,32 +218,7 @@ func (m Model) View() string {
 	} else {
 		lines = append(lines, muted.Render(plainFit(notice, w)))
 	}
-	hint := m.controlLine()
-
-	if !m.player.Connected {
-		hint = "Enter on a song starts the player · c reconnect · L sign in"
-	} else if !m.player.LoggedIn {
-		hint = "Sign-in pending · c restarts player · first setup needs Spotify device pairing"
-	}
-	if m.inputMode == "search" {
-		hint = "←/→ edit · Ctrl-G clear · Enter search · Esc cancel"
-	}
-	if m.updateNotice != "" && !m.player.Connected {
-		hint = m.updateNotice
-	}
-	lines = append(lines, muted.Render(plainFit(hint, w)))
-	footer := "Up/Down Move  Left Library  Enter Open  / Search  Hold i Help  q Quit"
-	if !m.sidebar {
-		footer = "Up/Down Move  Enter Play  Esc Library  / Search  Hold i Help  q Quit"
-	}
-	if w < 80 {
-		if m.sidebar {
-			footer = "Up/Down Move · Enter Open · / Search · i Help"
-		} else {
-			footer = "Up/Down Move · Enter Play · Esc Back · i Help"
-		}
-	}
-	lines = append(lines, bright.Render(plainFit(footer, w)))
+	lines = append(lines, muted.Render(plainFit(m.controlLine(), w)))
 	return bounded(lines, w, h)
 }
 func (m Model) inputLine(width int) string {
@@ -265,20 +243,13 @@ func (m Model) trackLine(row, width int) string {
 	if m.inputMode == "search" {
 		return m.historyLine(row, width)
 	}
-	if m.view == "downloads" {
-		messages := []string{"Offline Spotify downloads: unsupported.", "", "The current provider cannot download music.", "A playback cache is not an offline library.", "", "Esc returns to your library."}
-		if row < len(messages) {
-			return muted.Render(plainFit(messages[row], width))
-		}
-		return strings.Repeat(" ", width)
-	}
 	if m.loading {
 		if row == 1 {
 			return muted.Render(plainFit("Loading songs… you can keep browsing.", width))
 		}
 		return strings.Repeat(" ", width)
 	}
-	if m.rowError != "" {
+	if m.rowError != "" && len(m.tracks) == 0 {
 		messages := []string{"Couldn't load this collection.", m.rowError, "R retries · Esc returns to your library"}
 		if m.view == "playlist" {
 			messages = append(messages, "P can still request playlist playback.")

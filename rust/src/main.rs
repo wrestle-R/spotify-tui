@@ -99,17 +99,75 @@ fn command(method: &str, params: &Value) -> Result<Value, String> {
         "play_sequence" => return Ok(Sequence::parse(params)?.play()),
         "play_track" | "play_collection" => {
             let uri = params["uri"].as_str().ok_or("Missing Spotify URI")?;
-            if !["spotify:track:","spotify:playlist:","spotify:album:"].iter().any(|p|uri.starts_with(p)) || uri.len()>256 || uri.chars().any(char::is_control) { return Err("Invalid playable Spotify URI".into()); }
-            v["uri"] = json!(uri); "play"
-        },
-        "toggle_pause" => "_toggle_pause", "resume" => "play", "pause" => "pause", "next" => "skip_next", "previous" => "skip_prev",
+            if !["spotify:track:", "spotify:playlist:", "spotify:album:"]
+                .iter()
+                .any(|p| uri.starts_with(p))
+                || uri.len() > 256
+                || uri.chars().any(char::is_control)
+            {
+                return Err("Invalid playable Spotify URI".into());
+            }
+            v["uri"] = json!(uri);
+            "play"
+        }
+        "toggle_pause" => "_toggle_pause",
+        "resume" => "play",
+        "pause" => "pause",
+        "next" => "skip_next",
+        "previous" => "skip_prev",
         "activate" => "activate",
-        "seek" => {let p=params["position_ms"].as_u64().ok_or("Invalid seek position")?; if p>86_400_000{return Err("Seek position is too large".into())} v["position_ms"]=json!(p);"seek"},
-        "set_volume" => {let n=params["volume"].as_u64().filter(|n|*n<=100).ok_or("Volume must be 0 to 100")?;v["volume"]=json!(n);"set_volume"},
-        "set_shuffle" => {v["enabled"]=json!(params["enabled"].as_bool().ok_or("Shuffle needs a boolean")?);"set_shuffle"},
-        "add_to_queue" => {let uri=params["uri"].as_str().filter(|s|s.starts_with("spotify:track:")&&s.len()<256&&!s.chars().any(char::is_control)).ok_or("Queue needs a track URI")?;v["uri"]=json!(uri);"add_to_queue"},
-        "repeat_track" | "repeat_context" => {v["enabled"]=json!(params["enabled"].as_bool().ok_or("Repeat needs a boolean")?);if method=="repeat_track"{"set_repeat_track"}else{"set_repeat_context"}},
-        m if m.starts_with("download") => return Err("UnsupportedCapability: Spotify offline downloads are not available through this provider".into()),
+        "seek" => {
+            let p = params["position_ms"]
+                .as_u64()
+                .ok_or("Invalid seek position")?;
+            if p > 86_400_000 {
+                return Err("Seek position is too large".into());
+            }
+            v["position_ms"] = json!(p);
+            "seek"
+        }
+        "set_volume" => {
+            let n = params["volume"]
+                .as_u64()
+                .filter(|n| *n <= 100)
+                .ok_or("Volume must be 0 to 100")?;
+            v["volume"] = json!(n);
+            "set_volume"
+        }
+        "set_shuffle" => {
+            v["enabled"] = json!(params["enabled"]
+                .as_bool()
+                .ok_or("Shuffle needs a boolean")?);
+            "set_shuffle"
+        }
+        "add_to_queue" => {
+            let uri = params["uri"]
+                .as_str()
+                .filter(|s| {
+                    s.starts_with("spotify:track:")
+                        && s.len() < 256
+                        && !s.chars().any(char::is_control)
+                })
+                .ok_or("Queue needs a track URI")?;
+            v["uri"] = json!(uri);
+            "add_to_queue"
+        }
+        "repeat_track" | "repeat_context" => {
+            v["enabled"] = json!(params["enabled"]
+                .as_bool()
+                .ok_or("Repeat needs a boolean")?);
+            if method == "repeat_track" {
+                "set_repeat_track"
+            } else {
+                "set_repeat_context"
+            }
+        }
+        m if m.starts_with("download") => {
+            return Err(
+                "UnsupportedCapability: This operation is not available through this provider"
+                    .into(),
+            )
+        }
         _ => return Err("Unknown method".into()),
     };
     v["command"] = json!(name);
@@ -294,6 +352,7 @@ async fn bridge(
             let mut automatic: Option<Command> = None;
             let mut ending: Option<Instant> = None;
             let mut tick = time::interval(Duration::from_millis(100));
+            let mut last_metadata_query = Instant::now();
             loop {
                 tokio::select! {
                     _=stop.changed()=>{let _=ws.close(None).await;return},
@@ -377,7 +436,15 @@ async fn bridge(
                             _=>{},
                         }
                     },
-                    _=tick.tick()=>{if pending.as_ref().is_some_and(|p|p.started.elapsed()>Duration::from_secs(15)){if let Some(p)=pending.take(){let _=p.command.reply.send(Err("Provider command timed out; outcome unknown".into()));}break}},
+                    _=tick.tick()=>{
+                        if pending.is_none() && last_metadata_query.elapsed()>Duration::from_secs(2) {
+                            let state=shared.state.lock().await;
+                            let incomplete=state["logged_in"]==true && state["uri"].as_str().is_some_and(|uri|!uri.is_empty()) && (state["duration_ms"].as_u64().unwrap_or(0)==0 || state["title"].as_str().unwrap_or_default().is_empty());
+                            drop(state);
+                            if incomplete {let _=ws.send(Message::Text(json!({"type":"command","command":"get_state"}).to_string().into())).await;}
+                            last_metadata_query=Instant::now();
+                        }
+                        if pending.as_ref().is_some_and(|p|p.started.elapsed()>Duration::from_secs(15)){if let Some(p)=pending.take(){let _=p.command.reply.send(Err("Provider command timed out; outcome unknown".into()));}break}},
                 }
             }
             if let Some(p) = pending.take() {
@@ -482,7 +549,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         return Ok(());
     }
     if args.first().map(String::as_str) != Some("serve") {
-        println!("Usage: spotify-tui-playback serve --socket PATH [--provider-url ws://127.0.0.1:PORT] [--soloist-path PATH --provider-data PATH --provider-cache PATH]\nProvider API key may be supplied on stdin. Offline downloads are unsupported.");
+        println!("Usage: spotify-tui-playback serve --socket PATH [--provider-url ws://127.0.0.1:PORT] [--soloist-path PATH --provider-data PATH --provider-cache PATH]\nProvider API key may be supplied on stdin.");
         return Ok(());
     }
     let options: HashMap<String, String> = args[1..]
@@ -611,7 +678,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 mod tests {
     use super::*;
     #[test]
-    fn refuses_offline_and_invalid_volume() {
+    fn refuses_unsupported_commands_and_invalid_volume() {
         assert!(command("download_start", &json!({}))
             .unwrap_err()
             .contains("UnsupportedCapability"));

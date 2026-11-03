@@ -8,7 +8,7 @@ import (
 
 type control struct{ label, key string }
 
-var controls = []control{{"Prev", "ctrl+left"}, {"Play/Pause", " "}, {"Next", "ctrl+right"}, {"Shuffle", "s"}, {"Repeat", "r"}, {"Instructions", "i"}}
+var controls = []control{{"Prev", "ctrl+left"}, {"Play/Pause", " "}, {"Next", "ctrl+right"}, {"Shuffle", "s"}, {"Repeat", "r"}, {"Help", "?"}}
 
 func (m Model) sideWidth() int {
 	if m.width < 80 {

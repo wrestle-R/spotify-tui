@@ -40,16 +40,6 @@ func TestSearchKeysTypeInsteadOfControllingPlayer(t *testing.T) {
 		t.Fatalf("typed %q", m.input)
 	}
 }
-func TestDownloadsShowsUnsupportedCapability(t *testing.T) {
-	m := Model{}
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
-	m = updated.(Model)
-	m.width = 100
-	m.height = 30
-	if !strings.Contains(m.View(), "unsupported") {
-		t.Fatal("offline status missing")
-	}
-}
 func TestLayoutsFitAndHandleUnicode(t *testing.T) {
 	cfg := config.Config{ClientID: strings.Repeat("a", 32)}
 	for _, size := range [][2]int{{100, 30}, {80, 24}, {60, 18}, {35, 10}, {20, 5}} {

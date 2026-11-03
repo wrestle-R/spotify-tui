@@ -8,27 +8,33 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/wrestle-R/Spotify-Tui/go/internal/config"
+	"github.com/wrestle-R/Spotify-Tui/go/internal/spotify"
 )
 
-func TestExploreIsFirstAndInstructionsScrollWithoutClosing(t *testing.T) {
+func TestExploreAndCompactGuide(t *testing.T) {
 	m := NewDemo()
 	if m.view != "explore" || m.sideLabels()[0] != "Explore" {
-		t.Fatal("Explore isn't the starting collection")
+		t.Fatal("Explore isn't first")
 	}
 	m, _ = runeKey(m, 'i')
-	m.height = 15
-	m.width = 40
-	m, _ = key(m, tea.KeyPgDown)
-	if !m.help || m.helpOffset == 0 {
-		t.Fatal("instructions closed instead of scrolling")
+	m.width = 110
+	m.height = 36
+	view := m.View()
+	for _, label := range []string{"Playback", "Navigation", "Search", "Editing"} {
+		if !strings.Contains(view, label) {
+			t.Fatal("missing guide group", label)
+		}
 	}
-	m, _ = key(m, tea.KeyEnd)
-	if !strings.Contains(m.View(), "unsupported") {
-		t.Fatal("last instructions cannot be reached")
+	if strings.Contains(view, "Mouse & desktop") || strings.Contains(view, "Start with Explore") {
+		t.Fatal("extra sections remain")
+	}
+	m, _ = key(m, tea.KeyDown)
+	if !m.help || m.helpOffset != 0 {
+		t.Fatal("guide should not scroll")
 	}
 	m, _ = key(m, tea.KeyEsc)
 	if m.help {
-		t.Fatal("instructions did not close")
+		t.Fatal("guide did not dismiss")
 	}
 }
 func TestSearchHistorySurvivesRestartAndCanBeClickedOrCleared(t *testing.T) {
@@ -93,5 +99,70 @@ func TestMouseUsesScrolledRowAndCtrlArrowsWorkInsideSearch(t *testing.T) {
 	calls := m.Player.(*playerStub).calls
 	if calls[len(calls)-1] != "next" {
 		t.Fatal("Ctrl-Right did not skip")
+	}
+}
+
+func TestCollectionSwitchUsesCachedRowsSelectionAndExplicitRefresh(t *testing.T) {
+	m := fixture()
+	m.selected = 31
+	m.trackOffset = 20
+	cmd := m.open("playlist", "Other", "other")
+	next, _ := m.Update(cmd())
+	m = next.(Model)
+	if m.loading {
+		t.Fatal("fixture did not load")
+	}
+	cmd = m.open("liked", "Liked songs", "")
+	if cmd != nil || m.loading || len(m.tracks) != 100 || m.selected != 31 || m.trackOffset != 20 {
+		t.Fatal("returning to collection did not restore immediately")
+	}
+	m.sidebar = false
+	cmd = m.refresh()
+	if cmd == nil || !m.loading {
+		t.Fatal("explicit refresh did not bypass cache")
+	}
+}
+func TestStreamedRowsAppearBeforeCompleteAndOldBatchesStayOut(t *testing.T) {
+	m := fixture()
+	m.generation = 4
+	m.loading = true
+	m.tracks = nil
+	batch := rowsMsg{generation: 4, partial: true, tracks: []spotify.Track{{Name: "First"}}}
+	next, _ := m.Update(batch)
+	m = next.(Model)
+	if m.loading || !m.loadingMore || len(m.tracks) != 1 {
+		t.Fatal("first batch not immediately visible")
+	}
+	next, _ = m.Update(rowsMsg{generation: 3, partial: true, appendRows: true, tracks: []spotify.Track{{Name: "Old"}}})
+	m = next.(Model)
+	if len(m.tracks) != 1 {
+		t.Fatal("old collection batch replaced active rows")
+	}
+	next, _ = m.Update(rowsMsg{generation: 4, partial: true, appendRows: true, tracks: []spotify.Track{{Name: "Second"}}})
+	m = next.(Model)
+	if len(m.tracks) != 2 || m.tracks[1].Name != "Second" {
+		t.Fatal("ordered batch append failed")
+	}
+}
+
+func TestFourGuideGroupsFitWithoutScrollingAndFooterHasNoKeyHints(t *testing.T) {
+	for _, size := range [][2]int{{80, 24}, {110, 30}, {90, 55}, {230, 51}} {
+		m := fixture()
+		m.width = size[0]
+		m.height = size[1]
+		m.help = true
+		content := m.View()
+		for _, text := range []string{"Playback", "Navigation", "Search", "Editing", "Playlist start", "Erase to end"} {
+			if !strings.Contains(content, text) {
+				t.Fatalf("%v guide clipped %q", size, text)
+			}
+		}
+		if strings.Contains(content, "Your app") || strings.Contains(content, "Mouse & desktop") || strings.Contains(content, "Start with Explore") {
+			t.Fatal("extra guide content remains")
+		}
+		m.help = false
+		if strings.Contains(m.View(), "Up/Down Move") || strings.Contains(m.View(), "Hold i Help") {
+			t.Fatal("footer shortcuts remain")
+		}
 	}
 }

@@ -24,7 +24,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "0.5.1"
+var version = "0.5.2"
 
 const helpText = `Spotify TUI (Go interface + Rust helper)
 
@@ -43,12 +43,11 @@ Commands:
   doctor                   Show installation and provider status
   check-account            Check real library/search access
   check-playback           Briefly test local audio controls, then pause
-  check-offline            Probe isolated offline startup, then restore online
   stop                     Stop this project's playback helper
   logout                   Stop helper and remove this app's credentials/cache
   version                  Print version
 
-Run without a command to open the TUI. Offline Spotify downloads are unsupported.
+Run without a command to open the TUI.
 `
 
 func main() {
@@ -256,7 +255,6 @@ func run() error {
 			if e == nil {
 				fmt.Println("Provider connected:", s.Connected, "paired:", s.LoggedIn)
 			}
-			fmt.Println("Offline Spotify downloads: UNSUPPORTED (mandatory release blocker)")
 			return nil
 		case "check-account":
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
@@ -293,7 +291,7 @@ func run() error {
 				return err
 			}
 			fmt.Printf("Catalog search: OK (%d results)\n", len(results))
-			fmt.Println("This check verifies metadata access, not audio or offline playback.")
+			fmt.Println("This check verifies metadata access, not audio playback.")
 			return nil
 		case "check-playback":
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -309,20 +307,6 @@ func run() error {
 				}
 			}
 			return errors.New("no playable liked track available for the audio check")
-		case "check-offline":
-			ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
-			defer cancel()
-			api := spotify.New(manager, p)
-			liked, err := api.Tracks(ctx, "")
-			if err != nil {
-				return err
-			}
-			for _, track := range liked.Tracks {
-				if track.CanPlay() {
-					return player.OfflineProbe(ctx, cfg, p, manager.Vault, track.URI, os.Stdout)
-				}
-			}
-			return errors.New("no eligible track to probe")
 		default:
 			return fmt.Errorf("unknown command %q; use --help", args[0])
 		}

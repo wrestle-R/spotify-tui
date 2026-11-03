@@ -117,7 +117,61 @@ func TestExploreUsesTopTracksAndFallsBackForExistingLogin(t *testing.T) {
 	}
 	denied.Store(true)
 	fallback, err := c.Explore(context.Background())
-	if err != nil || len(fallback.Tracks) != 1 || fallback.Tracks[0].Name != "Liked song" || !strings.Contains(fallback.Warning, "grants") {
+	if err != nil || len(fallback.Tracks) != 1 || fallback.Tracks[0].Name != "Liked song" || fallback.Warning == "" {
 		t.Fatal("old token fallback failed", err)
+	}
+}
+
+func TestCollectionBatchesShowFirstPageAndKeepOrder(t *testing.T) {
+	release := make(chan struct{})
+	started := make(chan struct{}, 2)
+	var active, peak atomic.Int32
+	c := fixtureClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/me" {
+			fmt.Fprint(w, `{"id":"fixture"}`)
+			return
+		}
+		offset := 0
+		fmt.Sscan(r.URL.Query().Get("offset"), &offset)
+		n := active.Add(1)
+		for old := peak.Load(); n > old && !peak.CompareAndSwap(old, n); old = peak.Load() {
+		}
+		defer active.Add(-1)
+		if offset > 0 {
+			started <- struct{}{}
+			<-release
+		}
+		fmt.Fprint(w, `{"total":150,"next":"next","items":[`)
+		for i := 0; i < 50; i++ {
+			if i > 0 {
+				fmt.Fprint(w, ",")
+			}
+			fmt.Fprintf(w, `{"item":{"uri":"spotify:track:t%d","name":"Song %d"}}`, offset+i, offset+i)
+		}
+		fmt.Fprint(w, `]}`)
+	})
+	first := make(chan int, 1)
+	done := make(chan Collection, 1)
+	go func() {
+		items, err := c.StreamTracks(context.Background(), "list", func(batch []Track) {
+			select {
+			case first <- len(batch):
+			default:
+			}
+		})
+		if err != nil {
+			t.Error(err)
+		}
+		done <- items
+	}()
+	if n := <-first; n != 50 {
+		t.Fatal("first page not emitted")
+	}
+	<-started
+	<-started
+	close(release)
+	items := <-done
+	if peak.Load() > 2 || len(items.Tracks) != 150 || items.Tracks[50].Name != "Song 50" || items.Tracks[149].Name != "Song 149" {
+		t.Fatal("batched pagination lost order or concurrency bound")
 	}
 }

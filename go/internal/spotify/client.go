@@ -223,59 +223,116 @@ func (c *Client) Playlists(ctx context.Context) ([]Playlist, error) {
 	return nil, errors.New("playlist safety limit reached; refine library scope")
 }
 
-func (c *Client) Tracks(ctx context.Context, playlistID string) (Collection, error) {
+type trackPage struct {
+	Items []struct {
+		Track *Track `json:"track"`
+		Item  *Track `json:"item"`
+	} `json:"items"`
+	Next  *string `json:"next"`
+	Total int     `json:"total"`
+}
+
+func (c *Client) Tracks(ctx context.Context, id string) (Collection, error) {
+	return c.StreamTracks(ctx, id, nil)
+}
+
+// StreamTracks emits ordered batches. Only two requests are in flight, and a
+// complete result alone replaces the disk cache; failed refreshes keep it intact.
+func (c *Client) StreamTracks(ctx context.Context, id string, emit func([]Track)) (Collection, error) {
 	account, err := c.Account(ctx)
 	if err != nil {
 		return Collection{}, err
 	}
-	key := "liked"
-	route := "/me/tracks"
-	if playlistID != "" {
-		key = "playlist-" + playlistID
-		route = "/playlists/" + url.PathEscape(playlistID) + "/items"
+	key, route := "liked", "/me/tracks"
+	if id != "" {
+		key = "playlist-" + id
+		route = "/playlists/" + url.PathEscape(id) + "/items"
 	}
 	cachePath := filepath.Join(c.CacheDir, account, key+".json")
-	result := Collection{Fetched: time.Now()}
-	for offset := 0; offset < 100000; {
-		var page struct {
-			Items []struct {
-				Track *Track `json:"track"`
-				Item  *Track `json:"item"`
-			} `json:"items"`
-			Next *string `json:"next"`
-		}
-		err = c.get(ctx, fmt.Sprintf("%s?limit=50&offset=%d", route, offset), &page)
-		if err != nil {
-			var old Collection
+	fallback := func(err error) (Collection, error) {
+		var old Collection
+		if ctx.Err() == nil {
 			if b, e := os.ReadFile(cachePath); e == nil && len(b) <= 16<<20 && json.Unmarshal(b, &old) == nil && time.Since(old.Fetched) < 7*24*time.Hour {
 				old.Stale = true
 				old.Warning = err.Error()
 				return old, nil
 			}
-			return Collection{}, err
 		}
-		for _, row := range page.Items {
-			track := row.Item
-			if track == nil {
-				track = row.Track
-			}
-			if track != nil {
-				result.Tracks = append(result.Tracks, *track)
-			}
-		}
-		if page.Next == nil || *page.Next == "" {
-			b, e := json.Marshal(result)
-			if e == nil && len(b) <= 16<<20 {
-				_ = config.AtomicWrite(cachePath, b)
-			}
-			return result, nil
-		}
-		if len(page.Items) == 0 {
-			return Collection{}, errors.New("Spotify returned an empty page with a continuation")
-		}
-		offset += len(page.Items)
+		return Collection{}, err
 	}
-	return Collection{}, errors.New("track safety limit reached")
+	fetch := func(offset int) (trackPage, error) {
+		var p trackPage
+		err := c.get(ctx, fmt.Sprintf("%s?limit=50&offset=%d", route, offset), &p)
+		return p, err
+	}
+	result := Collection{Fetched: time.Now()}
+	appendPage := func(p trackPage) {
+		batch := make([]Track, 0, len(p.Items))
+		for _, row := range p.Items {
+			t := row.Item
+			if t == nil {
+				t = row.Track
+			}
+			if t != nil {
+				batch = append(batch, *t)
+			}
+		}
+		result.Tracks = append(result.Tracks, batch...)
+		if emit != nil && len(batch) > 0 {
+			emit(batch)
+		}
+	}
+	first, err := fetch(0)
+	if err != nil {
+		return fallback(err)
+	}
+	appendPage(first)
+	if first.Total > 100000 {
+		return Collection{}, errors.New("collection safety limit reached")
+	}
+	if first.Total > len(first.Items) && first.Next != nil && *first.Next != "" && len(first.Items) == 50 {
+		for offset := 50; offset < first.Total; offset += 100 {
+			count := min(2, (first.Total-offset+49)/50)
+			pages := make([]trackPage, count)
+			errs := make([]error, count)
+			var group sync.WaitGroup
+			for i := 0; i < count; i++ {
+				group.Add(1)
+				go func(i int) { defer group.Done(); pages[i], errs[i] = fetch(offset + i*50) }(i)
+			}
+			group.Wait()
+			for i, p := range pages {
+				if errs[i] != nil {
+					return fallback(errs[i])
+				}
+				if len(p.Items) == 0 {
+					return fallback(errors.New("Spotify returned an empty collection batch"))
+				}
+				appendPage(p)
+			}
+		}
+	} else {
+		page := first
+		offset := len(first.Items)
+		for page.Next != nil && *page.Next != "" {
+			if len(page.Items) == 0 {
+				return fallback(errors.New("Spotify returned an empty page with a continuation"))
+			}
+			if offset >= 100000 {
+				return Collection{}, errors.New("collection safety limit reached")
+			}
+			page, err = fetch(offset)
+			if err != nil {
+				return fallback(err)
+			}
+			appendPage(page)
+			offset += len(page.Items)
+		}
+	}
+	if b, e := json.Marshal(result); e == nil && len(b) <= 16<<20 {
+		_ = config.AtomicWrite(cachePath, b)
+	}
+	return result, nil
 }
 
 func (c *Client) Search(ctx context.Context, query string) ([]Track, error) {
@@ -297,11 +354,29 @@ func (c *Client) Explore(ctx context.Context) (Collection, error) {
 	if err == nil && len(top.Items) > 0 {
 		return Collection{Tracks: top.Items}, nil
 	}
-	liked, likedErr := c.Tracks(ctx, "")
-	if err != nil {
-		liked.Warning = "Your rotation + liked songs · L grants Spotify top-track access"
-	} else {
-		liked.Warning = "Liked songs · Spotify is still learning your favourites"
+	var page trackPage
+	likedErr := c.get(ctx, "/me/tracks?limit=50&offset=0", &page)
+	liked := Collection{Warning: "Your rotation + liked songs"}
+	for _, row := range page.Items {
+		track := row.Item
+		if track == nil {
+			track = row.Track
+		}
+		if track != nil {
+			liked.Tracks = append(liked.Tracks, *track)
+		}
+	}
+	if likedErr != nil {
+		if account, e := c.Account(ctx); e == nil {
+			var cached Collection
+			if b, e := os.ReadFile(filepath.Join(c.CacheDir, account, "liked.json")); e == nil && len(b) <= 16<<20 && json.Unmarshal(b, &cached) == nil {
+				liked.Tracks = cached.Tracks
+				if len(liked.Tracks) > 50 {
+					liked.Tracks = liked.Tracks[:50]
+				}
+				likedErr = nil
+			}
+		}
 	}
 	return liked, likedErr
 }

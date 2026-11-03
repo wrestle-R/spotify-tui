@@ -4,21 +4,12 @@ Reviewed 28 October 2026. Sources describe upstream capabilities; this project h
 
 ## Spotify playback
 
-1. [Soloist overview](https://developer.spotify.com/documentation/soloist): official headless playback, personal key, redistribution restrictions, build expiry. Candidate, not proof of offline downloads.
-2. [Soloist features](https://developer.spotify.com/documentation/soloist/features): Connect, local control, and single-track operation. Reviewed feature list does not establish offline downloads.
 3. [Soloist authentication](https://developer.spotify.com/documentation/soloist/concepts/authentication): personal API key and stored Connect session are separate.
 4. [Soloist CLI](https://developer.spotify.com/documentation/soloist/reference/command-line): audio routing, cache, pairing, diagnostics, and exit codes. Cache settings are not a download API.
 5. [Soloist WebSocket API](https://developer.spotify.com/documentation/soloist/reference/websocket-api): local integration protocol and missing built-in authentication/browser security protections.
 6. [Soloist downloads and updates](https://developer.spotify.com/documentation/soloist/reference/downloads-and-updates): obtaining the player executable, not music downloads.
-7. [Web Playback SDK reference](https://developer.spotify.com/documentation/web-playback-sdk/reference): browser streaming controls; no exposed offline download facility in the reviewed reference.
 
 ## Community playback
-
-8. [librespot repository](https://github.com/librespot-org/librespot): open-source Spotify playback/Connect engine; Premium required.
-9. [librespot offline discussion #610](https://github.com/librespot-org/librespot/discussions/610): maintainer response dated 6 November 2025 says its encrypted cache still requires network access for decryption. This is central negative evidence for the offline gate.
-10. [librespot download feature request #1243](https://github.com/librespot-org/librespot/issues/1243): closed as not planned. No inference that cached audio becomes a supported offline library.
-11. [spotify-player](https://github.com/aome510/spotify-player): existing terminal-player reference for comparison before building another player. Its existence does not prove this project's offline requirement.
-12. [Spotifyd](https://github.com/Spotifyd/spotifyd): community headless streaming reference. Also not offline proof.
 
 These projects are references only. No upstream code has been copied or dependencies installed in this planning session. Review licenses before reuse.
 
@@ -48,7 +39,5 @@ These projects are references only. No upstream code has been copied or dependen
 Exact package versions are intentionally not frozen before a real build and compatibility review. The implementation must record and lock its chosen versions.
 
 ## Interpretation limits
-
-Negative conclusion: no supported offline route has been established from the reviewed documentation. This is not a claim that no future or separately authorized provider can ever support offline playback. Existing community claims do not override provider requirements or replace a cold-start test.
 
 No account login, private API access, encrypted-store inspection, license bypass, or audio downloading occurred during research.

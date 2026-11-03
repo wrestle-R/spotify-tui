@@ -1,10 +1,6 @@
 # Platform note
 
-Apple Silicon Mac users: follow [macOS setup](MACOS.md). Linux setup below uses the same account/provider flow. Soloist has a separate official Mac arm64 build. The Linux tray and namespace offline probe are not macOS features.
-
 # Run the development build
-
-This is the initial Go/Rust implementation. Offline Spotify downloads remain unsupported and the complete product is not accepted. Real account, local playback, and a clean online restart passed on the development machine; the isolated offline cold start failed. Fresh installations require your own account and provider setup. Automated tests use synthetic data.
 
 ## Build
 
@@ -81,13 +77,12 @@ If verification fails in the normal browser too, complete Spotify's recovery or 
 - `R`/Ctrl-R refreshes the focused pane. `c` reconnects; `L` signs in through the browser; `?`/F1 opens help.
 - Enter on a song connects the player automatically. Pending commands show feedback and prevent duplicate submissions while navigation remains available.
 - `q` closes the TUI with audio continuing; `Q` stops the helper and exits; Ctrl-C exits. `spotify-tui stop` stops this project's helper from another terminal.
-- `d` displays the unsupported offline capability. It cannot download songs.
 
 Explore is the first collection and opens on startup. It uses Spotify top tracks with the `user-top-read` permission; press `L` once to grant that permission after upgrading. Existing sign-ins fall back to local listening history and liked songs. Select an Explore/search song to play it, then Spotify Autoplay supplies suggestions when enabled in your account. Soloist exposes no autoplay toggle, so enable it in Spotify settings. Existing Spotify queue entries retain their usual priority.
 
 Liked songs and playlists continue from the selected row using a sequence owned by the Rust helper, including when the terminal is closed. `Ctrl-Right` / `n` skips forward and `Ctrl-Left` / `p` goes back (or restarts the current song after three seconds). Collection transitions can briefly buffer while Soloist changes context. A new selection replaces the local sequence; another Spotify controller can take over playback. A sequence accepts up to 5,000 playable tracks. `P` starts the native playlist context from its beginning. Search currently returns ten results.
 
-Hold `i` to show the shortcut overlay over your music; release it to hide it. This uses real key-release reporting in terminals such as Kitty, Ghostty and Foot. Other terminals can use `?` or F1 to toggle the same overlay. Arrow/page keys and the mouse wheel scroll the guide, and `1`–`6` or a section label jumps to a group. Switching away also dismisses a held overlay. Click a collection to open it, a song to play it, a saved search to rerun it or the progress bar to seek. The player buttons support clicks too. Hold Shift for your terminal's normal text selection.
+Hold `i` to show the shortcut overlay over your music; release it to hide it. This uses real key-release reporting in terminals such as Kitty, Ghostty and Foot. Other terminals can use `?` or F1 to toggle the same overlay. The four groups (Playback, Navigation, Search and Editing) fit together without scrolling. Switching away also dismisses a held overlay. Click a collection to open it, a song to play it, a saved search to rerun it or the progress bar to seek. The player buttons support clicks too. Hold Shift for your terminal's normal text selection.
 
 Search shows the last 30 distinct queries, stored locally with up to 100 played songs in the private state directory (`history.json`, mode 0600). Up/Down recalls queries; Ctrl-X clears search history; Ctrl-G clears only the input. Ctrl-arrows control playback while typing. Demo history never touches disk, and logout removes local history.
 
@@ -113,8 +108,6 @@ make check
 SPOTIFY_TUI_TEST_HELPER="$PWD/dist/spotify-tui-playback" make test
 ```
 
-The last command runs Go against the real compiled Rust helper with a deliberately unavailable provider. It verifies capabilities, communication, offline rejection, and shutdown without an account. Rust also tests its WebSocket bridge against a synthetic local provider. These are integration checks, not proof of Spotify audio or offline entitlement.
-
 ## Tray and updates
 
 The normal TUI starts a pure-Go StatusNotifierItem companion automatically. No GTK or extra tray binary is required. It needs a desktop panel with a StatusNotifier watcher: for example Quickshell's tray on Hyprland. GNOME may require an AppIndicator extension. We do not change panel configuration. `spotify-tui doctor` reports host availability and whether the companion is running. `--no-tray` skips automatic startup.
@@ -124,3 +117,9 @@ Left-click opens a terminal TUI. The context menu offers Open, Pause/Resume, Nex
 The TUI checks GitHub's latest stable release in the background at startup. It does not install automatically. Ctrl-U checks again or installs the offered update, verifies the archive SHA-256, ELF architecture and matching Go/Rust version, then restarts. Playing tracks are requested again with their prior position after helper restart, subject to Spotify connectivity. Playback can be interrupted while restarting. Ctrl-G clears a search field; Ctrl-U is reserved globally for updating.
 
 Use `spotify-tui check-updates` or `spotify-tui update` outside the UI. Public releases need only network access; authenticated `gh` is a fallback for private repository access or API restrictions. Only Linux x86_64 and ordinary stable versions are accepted. Updates require a managed installation from `install.sh`, and refuse unrelated files or command symlinks. Old builds remain available for rollback. A single `lib/spotify-tui/current` pointer activates both binaries; installations and updates share a lock. Config, keyring and provider data are not modified. Archives are checksum-verified, not signed.
+
+## Fast library switching
+
+Loaded collections and searches stay in a bounded in-memory cache for 15 minutes. Switching back restores the songs, selection and scroll position immediately. Press R to force a fresh request. Signing in again clears this session cache.
+
+Large collections arrive in ordered batches of 50 tracks with at most two Spotify requests in flight. The first batch is visible immediately while the rest loads. Complete results alone replace the account-scoped disk cache; a failed refresh preserves the previous complete collection. Explore only requests its first 50 fallback songs rather than waiting for an entire liked library.

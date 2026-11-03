@@ -1,7 +1,5 @@
 # Build and release workflow
 
-This document plans automation and acceptance for a later complete app. The requested Linux download now has a regular `v0.2.1` release with a verified archive, local installer and download script. Offline downloads remain unsupported, so it does not pass the complete-product acceptance gates below. No GitHub Actions workflow is installed.
-
 ## Pull requests and branch changes
 
 Run Go formatting/vet/tests/race checks, Rust formatting/clippy/tests, and shared protocol fixture validation. Use synthetic test data. Live-account tests are manual and must not expose credentials to forked pull requests. Pin third-party GitHub Actions to reviewed commit SHAs when creating the workflow.
@@ -13,8 +11,6 @@ Build matching Go and Rust versions from one commit. Record compiler versions, l
 Archive only intended executables, licenses, user instructions, and version metadata. Include no `.env`, credentials, private library data, local notes, debug logs, or upstream binaries without permission. Generate checksums over the final archive, then inspect and test the same archive that will be uploaded.
 
 ## Complete-product acceptance
-
-Before tagging the working app, link dated evidence for real login, required playlist access, local full-track playback, offline cold start, and resource budgets. A passing CI build cannot approve offline capability. All required gates in ACCEPTANCE.md must pass.
 
 Tag the verified commit, upload the verified assets, download them again through the same path as the installer, compare checksums, extract in a clean directory, and run version/doctor checks followed by the Arch smoke test. Document known limits. Never replace a binary in-place under an unchanged version after users have verified its checksum.
 

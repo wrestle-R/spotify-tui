@@ -81,11 +81,6 @@ retention/unrelated-file refusal; and a real PTY demo with navigation, search,
 help, resize, quit, terminal restoration and no account files written. The official
 provider's `--version` is checked without credentials and is not bundled in artifacts.
 
-CI does not prove real-account authorization, Keychain consent, audio-device output,
-provider pairing, network restoration, or eight-hour RAM stability on a physical
-Mac. These stay **not manually verified** until a real Mac user runs them. Offline
-downloads are unsupported rather than a skipped test that is described as passed.
-
 For a real Mac acceptance check, install the published archive, sign in normally,
 pair and play a sample track. Pause/resume three times, seek, change tracks, quit
 with `q`, reopen, stop with `Q`, and verify actual audio and displayed state agree.

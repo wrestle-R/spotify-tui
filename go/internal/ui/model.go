@@ -26,11 +26,12 @@ type Player interface {
 	Ensure(context.Context, config.Config, config.Paths, auth.Vault) error
 }
 type rowsMsg struct {
-	generation uint64
-	tracks     []spotify.Track
-	stale      bool
-	warning    string
-	err        error
+	partial, appendRows bool
+	generation          uint64
+	tracks              []spotify.Track
+	stale               bool
+	warning             string
+	err                 error
 }
 type playlistsMsg struct {
 	generation uint64
@@ -50,6 +51,9 @@ type loginMsg struct{ err error }
 type tickMsg time.Time
 
 type Model struct {
+	loadedAt                                   time.Time
+	viewCache                                  map[string]cachedView
+	loadingMore                                bool
 	helpHeld                                   bool
 	searchSidebar                              bool
 	history                                    localHistory
@@ -87,7 +91,7 @@ type Model struct {
 }
 
 func New(c config.Config, p config.Paths, a *auth.Manager, library Library, player Player) Model {
-	m := Model{Cfg: c, Paths: p, Auth: a, Library: library, Player: player, width: 100, height: 30, title: "Explore", view: "explore", sidebar: true, loading: c.ClientID != "", playlistsLoading: c.ClientID != "", status: "Choose a collection, then Enter. / searches Spotify."}
+	m := Model{Cfg: c, Paths: p, Auth: a, Library: library, Player: player, width: 100, height: 30, title: "Explore", view: "explore", sidebar: true, loading: c.ClientID != "", playlistsLoading: c.ClientID != "", status: "Your music, ready when you are."}
 	m.historySelection = -1
 	m.loadHistory()
 	if c.ClientID == "" {
@@ -119,7 +123,12 @@ func (m Model) loadRows(view, value string, generation uint64) tea.Cmd {
 func (m Model) loadRowsContext(parent context.Context, view, value string, generation uint64) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(parent, 2*time.Minute)
-		defer cancel()
+		streaming := false
+		defer func() {
+			if !streaming {
+				cancel()
+			}
+		}()
 		if view == "explore" {
 			var collection spotify.Collection
 			var err error
@@ -166,6 +175,31 @@ func (m Model) loadRowsContext(parent context.Context, view, value string, gener
 		if view == "search" {
 			items, e := m.Library.Search(ctx, value)
 			return rowsMsg{generation: generation, tracks: items, err: e}
+		}
+		if streamer, ok := m.Library.(interface {
+			StreamTracks(context.Context, string, func([]spotify.Track)) (spotify.Collection, error)
+		}); ok {
+			streaming = true
+			events := make(chan rowsMsg, 2)
+			go func() {
+				defer close(events)
+				defer cancel()
+				first := true
+				collection, err := streamer.StreamTracks(ctx, value, func(batch []spotify.Track) {
+					msg := rowsMsg{generation: generation, tracks: batch, partial: true, appendRows: !first}
+					first = false
+					select {
+					case events <- msg:
+					case <-ctx.Done():
+					}
+				})
+				final := rowsMsg{generation: generation, tracks: collection.Tracks, stale: collection.Stale, warning: collection.Warning, err: err}
+				select {
+				case events <- final:
+				case <-ctx.Done():
+				}
+			}()
+			return waitRows(events)()
 		}
 		items, e := m.Library.Tracks(ctx, value)
 		return rowsMsg{generation: generation, tracks: items.Tracks, stale: items.Stale, warning: items.Warning, err: e}
@@ -248,7 +282,12 @@ func (m *Model) perform(label string, commands ...playerCommand) tea.Cmd {
 		return actionMsg{message: label + " requested"}
 	}
 }
-func (m *Model) open(view, title, value string) tea.Cmd {
+func (m *Model) open(view, title, value string) tea.Cmd { return m.openView(view, title, value, false) }
+func (m *Model) openFresh(view, title, value string) tea.Cmd {
+	return m.openView(view, title, value, true)
+}
+func (m *Model) openView(view, title, value string, force bool) tea.Cmd {
+	m.rememberView()
 	if m.dataCancel != nil {
 		m.dataCancel()
 	}
@@ -272,6 +311,22 @@ func (m *Model) open(view, title, value string) tea.Cmd {
 	m.rowError = ""
 	m.warning = ""
 	m.sidebar = false
+	if !force {
+		if old, ok := m.viewCache[viewKey(view, value)]; ok && time.Since(old.fetched) < 15*time.Minute {
+			m.tracks = old.tracks
+			m.loadedAt = old.fetched
+			m.selected = old.selected
+			m.trackOffset = old.offset
+			m.warning = old.warning
+			m.loading = false
+			m.loadingMore = false
+			old.used = time.Now()
+			m.viewCache[viewKey(view, value)] = old
+			m.notify(fmt.Sprintf("%d songs", len(m.tracks)), "info")
+			return nil
+		}
+	}
+	m.loadingMore = false
 	m.notify("Loading "+title+"…", "info")
 	return m.loadRowsContext(ctx, view, value, m.generation)
 }
@@ -288,20 +343,6 @@ func (m *Model) cancelWork() {
 	if m.loginCancel != nil {
 		m.loginCancel()
 	}
-}
-func (m *Model) showDownloads() {
-	if m.dataCancel != nil {
-		m.dataCancel()
-	}
-	m.generation++
-	m.view = "downloads"
-	m.title = "Offline playback"
-	m.loading = false
-	m.tracks = nil
-	m.sidebar = false
-	m.rowError = ""
-	m.warning = ""
-	m.notify("Offline downloads are unavailable through the current provider.", "info")
 }
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -357,22 +398,41 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.player.Status = "unavailable"
 			m.player.Error = msg.err.Error()
 		}
+	case rowsStreamMsg:
+		next, cmd := m.Update(msg.rows)
+		model := next.(Model)
+		if msg.rows.generation != model.generation {
+			return model, cmd
+		}
+		return model, tea.Batch(cmd, waitRows(msg.next))
 	case rowsMsg:
 		if msg.generation != m.generation {
 			return m, nil
 		}
 		m.loading = false
+		m.loadingMore = msg.partial
+		if msg.partial {
+			if msg.appendRows {
+				m.tracks = append(m.tracks, msg.tracks...)
+			} else {
+				m.tracks = msg.tracks
+			}
+			m.rowError = ""
+			m.notify(fmt.Sprintf("%d songs loaded…", len(m.tracks)), "info")
+			return m.with(nil)
+		}
 		if msg.err != nil {
 			m.rowError = msg.err.Error()
 			m.notify("Couldn't load "+m.title+". R retries; Esc returns to the library.", "error")
 		} else {
 			m.tracks = msg.tracks
+			m.loadedAt = time.Now()
 			m.rowError = ""
 			m.warning = msg.warning
 			if msg.stale {
 				m.warning = "Cached metadata: " + msg.warning
 			}
-			label := fmt.Sprintf("%d tracks · Enter plays the selected song", len(msg.tracks))
+			label := fmt.Sprintf("%d songs", len(msg.tracks))
 			if msg.warning != "" {
 				label = msg.warning
 			}
@@ -416,6 +476,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if resetter, ok := m.Library.(interface{ ResetAccount() }); ok {
 				resetter.ResetAccount()
 			}
+			m.viewCache = nil
+			m.loading = true
 			m.playlists = nil
 			m.libraryGeneration++
 			m.playlistsLoading = true
@@ -510,15 +572,15 @@ func (m *Model) refresh() tea.Cmd {
 	}
 	switch m.view {
 	case "explore":
-		return m.open("explore", "Explore", "")
+		return m.openFresh("explore", "Explore", "")
 	case "liked":
-		return m.open("liked", "Liked songs", "")
+		return m.openFresh("liked", "Liked songs", "")
 	case "playlist":
-		return m.open("playlist", m.title, m.playlistID)
+		return m.openFresh("playlist", m.title, m.playlistID)
 	case "search":
-		return m.open("search", m.title, m.searchQuery)
+		return m.openFresh("search", m.title, m.searchQuery)
 	default:
-		m.notify("Offline downloads are not supported by this provider.", "info")
+		m.notify("Choose a collection to refresh.", "info")
 	}
 	return nil
 }

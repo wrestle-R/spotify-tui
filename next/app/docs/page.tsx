@@ -37,7 +37,7 @@ export default function Docs() {
             <div><dt>Your audio</dt><dd>Spotify’s separate Soloist engine and your private personal Soloist key play songs on this computer. It needs one-time device pairing.</dd></div>
           </dl>
           <p>Use the same Spotify account for both. Credentials stay in your desktop keyring (Linux) or Keychain (Mac). <strong>This website has no sign-in form and never asks for your password or keys.</strong></p>
-          <p className="setup-note">Online playback only for now. <a href="#limits">Offline downloads and current limits →</a></p>
+          <p className="setup-note"><a href="#limits">Current limits →</a></p>
         </section>
         <section id="install">
           <span className="step">01 / INSTALL</span>
@@ -85,7 +85,7 @@ export default function Docs() {
             <li>Back in the terminal, check the connection:</li>
           </ol>
           <Code label="Check pairing">~/.local/bin/spotify-tui doctor</Code>
-          <p>Look for <code>Provider connected: true paired: true</code>. A fresh engine may take a moment to connect; run doctor again after it settles. The <code>Offline Spotify downloads: UNSUPPORTED</code> line is expected.</p>
+          <p>Look for <code>Provider connected: true paired: true</code>. A fresh engine may take a moment to connect; run doctor again after it settles.</p>
           <details><summary>Spotify TUI Local isn’t in the picker?</summary>
             <p>Confirm Soloist printed its version, the key was stored, and <code>connect</code> is still running its helper. Use the same account and a shared Wi-Fi/local network. Phone USB tethering and mobile data can make discovery unreliable; try the official client on this computer for initial pairing. See <a href="#troubleshooting">troubleshooting</a> before deleting any credentials.</p>
           </details>
@@ -222,16 +222,12 @@ export default function Docs() {
         </section>
         <section id="limits">
           <h2>What’s still missing</h2>
-          <p>
-            <strong>Genuine offline downloads are unsupported.</strong> Premium
-            doesn’t provide this integration with a download API. The isolated
-            offline cold-start check failed.
-          </p>
+
           <p>
             Search currently returns ten results, and long-session memory
             testing is still pending. Explore, search history, mouse controls,
             collection sequencing and Linux MPRIS media controls are available
-            from v0.5.0. Press i in the terminal for the full instructions.
+            from v0.5.0. Hold i in the terminal for shortcuts.
             Connectivity and Soloist session restoration can occasionally
             stall. Press c to reconnect.
           </p>

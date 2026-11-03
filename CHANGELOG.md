@@ -2,13 +2,28 @@
 
 Features and fixes, grouped by release series, newest first. Full details, upgrade instructions and validation live on each version's page. GitHub hosts the Linux and Apple Silicon Mac downloads.
 
-**Latest stable: [v0.5.1](#v051)** · Stable releases only
+**Latest stable: [v0.5.2](#v052)** · Stable releases only
 
-[Download archive ↗](https://github.com/wrestle-R/spotify-tui-rdp/releases/tag/v0.5.1)
+[Download archive ↗](https://github.com/wrestle-R/spotify-tui-rdp/releases/tag/v0.5.2)
 
 ## 0.5.x
 
 **Explore, proper next/previous and desktop media controls**
+
+<a id="v052"></a>
+
+### v0.5.2
+
+3 November 2026 · **Stable** · Linux x86_64 and Apple Silicon macOS
+
+- Show only four compact shortcut groups in the hold-i modal, together without scrolling.
+- Remove bottom key hints and keep the green player controls.
+- Cache loaded views with their selection and scroll position; R forces a refresh.
+- Render collection pages progressively in ordered 50-song batches, with two requests at a time.
+- Load Explore's first songs without waiting for the whole library.
+- Refresh incomplete provider metadata so desktop duration and artwork fill in correctly.
+
+[Linux ↓](https://github.com/wrestle-R/spotify-tui-rdp/releases/download/v0.5.2/spotify-tui_0.5.2_linux_amd64.tar.gz) · [Apple Silicon Mac ↓](https://github.com/wrestle-R/spotify-tui-rdp/releases/download/v0.5.2/spotify-tui_0.5.2_darwin_arm64.tar.gz) · [Details →](docs/releases/v0.5.2.md)
 
 <a id="v051"></a>
 
@@ -125,6 +140,4 @@ The [planning-v0.1.0 bundle](https://github.com/wrestle-R/Spotify-Tui/releases/t
 
 ## Release verification
 
-Each release page explains the tested packages, requirements, known issues and available validation evidence. The current Linux package is checksum-verified and unsigned. Offline downloads, broader provider recovery and long-session memory/stability validation remain outstanding. The repository and release downloads are public.
-
-[Read the latest release details →](docs/releases/v0.5.1.md)
+[Read the latest release details →](docs/releases/v0.5.2.md)

@@ -51,23 +51,6 @@ func TestTerminalKeyTranslationKeepsEditingAndUppercaseShortcuts(t *testing.T) {
 		t.Fatal("quit was lost at runtime boundary")
 	}
 }
-func TestGuideSectionClickAndNarrowOverlayStayWithinTerminal(t *testing.T) {
-	for _, size := range [][2]int{{40, 15}, {80, 24}, {110, 30}, {230, 51}} {
-		m := fixture()
-		m.width = size[0]
-		m.height = size[1]
-		m.help = true
-		doc, x, y := m.guideGeometry()
-		g := doc.helpLayout()
-		hit := g.hits[4]
-		next, _ := m.clickHelp(x+1+hit.x, y+1+hit.y)
-		m = next.(Model)
-		if m.helpOffset == 0 {
-			t.Fatal("section jump did not move")
-		}
-	}
-}
-
 func TestSingleCharacterPasteCannotExecuteShortcut(t *testing.T) {
 	m := terminalModel{model: fixture()}
 	next, cmd := m.Update(tea.PasteMsg{Content: "q"})
