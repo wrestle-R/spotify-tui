@@ -20,6 +20,7 @@ import (
 	"github.com/godbus/dbus/v5"
 	"github.com/godbus/dbus/v5/introspect"
 	"github.com/godbus/dbus/v5/prop"
+	"github.com/wrestle-R/Spotify-Tui/go/internal/desktop"
 	"github.com/wrestle-R/Spotify-Tui/go/internal/ipc"
 )
 
@@ -40,6 +41,8 @@ type Service struct {
 	refreshMu sync.Mutex
 	state     ipc.State
 	stopped   bool
+	raise     func() error
+	entry     string
 }
 
 func hasOwner(conn *dbus.Conn) bool {
@@ -116,7 +119,10 @@ func (s *Service) values(iface string) map[string]dbus.Variant {
 	values := map[string]any{}
 	switch iface {
 	case rootInterface:
-		values = map[string]any{"CanQuit": false, "CanRaise": false, "HasTrackList": false, "Identity": "Spotify TUI", "SupportedUriSchemes": []string{"spotify"}, "SupportedMimeTypes": []string{}}
+		values = map[string]any{"CanQuit": false, "CanRaise": s.raise != nil, "HasTrackList": false, "Identity": "Spotify TUI", "SupportedUriSchemes": []string{"spotify"}, "SupportedMimeTypes": []string{}}
+		if s.entry != "" {
+			values["DesktopEntry"] = s.entry
+		}
 	case playerInterface:
 		state := s.snapshot()
 		status := "Stopped"
@@ -276,10 +282,17 @@ func abs(n int64) int64 {
 	return n
 }
 
-type root struct{}
+type root struct{ s *Service }
 
-func (*root) Raise() *dbus.Error { return nil }
-func (*root) Quit() *dbus.Error  { return nil }
+func (r *root) Raise() *dbus.Error {
+	if r.s.raise != nil {
+		if err := r.s.raise(); err != nil {
+			return dbus.MakeFailedError(err)
+		}
+	}
+	return nil
+}
+func (*root) Quit() *dbus.Error { return nil }
 
 type transport struct{ s *Service }
 
@@ -368,15 +381,27 @@ func Run(ctx context.Context, player Player) error {
 	if runtime.GOOS != "linux" {
 		return nil
 	}
+	executable, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	entry, _ := desktop.Register(executable)
+	return run(ctx, player, func() error {
+		openCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
+		defer cancel()
+		return desktop.Open(openCtx, executable)
+	}, entry)
+}
+func run(ctx context.Context, player Player, raise func() error, entry string) error {
 	conn, err := dbus.ConnectSessionBus()
 	if err != nil {
 		return err
 	}
 	defer conn.Close()
-	s := &Service{player: player, conn: conn}
+	s := &Service{player: player, conn: conn, raise: raise, entry: entry}
 	s.refresh()
 	t := &transport{s}
-	r := &root{}
+	r := &root{s}
 	l := &lifecycle{done: make(chan struct{})}
 	for _, entry := range []struct {
 		object any

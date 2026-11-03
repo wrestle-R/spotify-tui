@@ -2,12 +2,15 @@ package mpris
 
 import (
 	"context"
+	"errors"
 	"os"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/godbus/dbus/v5"
+	"github.com/wrestle-R/Spotify-Tui/go/internal/desktop"
 	"github.com/wrestle-R/Spotify-Tui/go/internal/ipc"
 )
 
@@ -38,7 +41,8 @@ func TestSessionBusTransportAndProperties(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	done := make(chan error, 1)
-	go func() { done <- Run(ctx, p) }()
+	var raised atomic.Int32
+	go func() { done <- run(ctx, p, func() error { raised.Add(1); return nil }, desktop.AppID) }()
 	conn, err := dbus.ConnectSessionBus()
 	if err != nil {
 		t.Fatal(err)
@@ -51,6 +55,16 @@ func TestSessionBusTransportAndProperties(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	obj := conn.Object(Name, path)
+	var rootValues map[string]dbus.Variant
+	if err = obj.Call("org.freedesktop.DBus.Properties.GetAll", 0, rootInterface).Store(&rootValues); err != nil {
+		t.Fatal(err)
+	}
+	if rootValues["CanRaise"].Value() != true || rootValues["DesktopEntry"].Value() != desktop.AppID {
+		t.Fatal("desktop shell cannot open player", rootValues)
+	}
+	if err = obj.Call(rootInterface+".Raise", 0).Err; err != nil || raised.Load() != 1 {
+		t.Fatal("Raise did not open the interface", err)
+	}
 	// Read real D-Bus properties, including microsecond units and object-path IDs.
 	var values map[string]dbus.Variant
 	for deadline := time.Now().Add(2 * time.Second); ; {
@@ -104,5 +118,12 @@ func TestSessionBusTransportAndProperties(t *testing.T) {
 	cancel()
 	if err = <-done; err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestRaiseReportsLauncherFailure(t *testing.T) {
+	r := &root{&Service{raise: func() error { return errors.New("activation denied") }}}
+	if err := r.Raise(); err == nil {
+		t.Fatal("launcher failure silently swallowed")
 	}
 }

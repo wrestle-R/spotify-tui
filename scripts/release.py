@@ -16,7 +16,7 @@ import tarfile
 import tempfile
 import urllib.request
 
-VERSION = "0.5.2"
+VERSION = "0.5.3"
 REPOSITORY = "wrestle-R/spotify-tui-rdp"
 BINARIES = ("spotify-tui", "spotify-tui-playback")
 LIMIT = 128 * 1024 * 1024
@@ -33,7 +33,7 @@ def target():
 
 def valid_version(version):
     if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
-        raise ValueError("Expected a stable version such as 0.5.2")
+        raise ValueError("Expected a stable version such as 0.5.3")
     return version
 
 

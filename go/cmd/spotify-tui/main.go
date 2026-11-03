@@ -15,6 +15,7 @@ import (
 
 	"github.com/wrestle-R/Spotify-Tui/go/internal/auth"
 	"github.com/wrestle-R/Spotify-Tui/go/internal/config"
+	"github.com/wrestle-R/Spotify-Tui/go/internal/desktop"
 	"github.com/wrestle-R/Spotify-Tui/go/internal/ipc"
 	"github.com/wrestle-R/Spotify-Tui/go/internal/mpris"
 	"github.com/wrestle-R/Spotify-Tui/go/internal/spotify"
@@ -24,7 +25,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "0.5.2"
+var version = "0.5.3"
 
 const helpText = `Spotify TUI (Go interface + Rust helper)
 
@@ -35,6 +36,7 @@ Commands:
   login [--no-browser]      Browser PKCE authorization for library/search
   provider-key             Save a personal Soloist API key securely
   connect                  Start/connect the local playback helper
+  open                     Focus or open the Linux terminal player
   tray                     Run the Linux tray companion
   tray-stop                Quit the tray, keep audio
   update                   Download and install the latest stable release
@@ -65,6 +67,14 @@ func run() error {
 		case "help", "--help":
 			fmt.Print(helpText)
 			return nil
+		case "open":
+			executable, err := os.Executable()
+			if err != nil {
+				return err
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+			defer cancel()
+			return desktop.Open(ctx, executable)
 		}
 	}
 	if len(os.Args) > 1 && (os.Args[1] == "--demo" || os.Args[1] == "demo") {

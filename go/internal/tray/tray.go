@@ -4,7 +4,6 @@ package tray
 import (
 	"bytes"
 	"context"
-	_ "embed"
 	"errors"
 	"fmt"
 	"image/png"
@@ -21,6 +20,7 @@ import (
 	"github.com/godbus/dbus/v5"
 	"github.com/godbus/dbus/v5/introspect"
 	"github.com/godbus/dbus/v5/prop"
+	"github.com/wrestle-R/Spotify-Tui/go/internal/desktop"
 	"github.com/wrestle-R/Spotify-Tui/go/internal/ipc"
 	"github.com/wrestle-R/Spotify-Tui/go/internal/mpris"
 	"github.com/wrestle-R/Spotify-Tui/go/internal/spotify"
@@ -32,9 +32,6 @@ const menuInterface = "com.canonical.dbusmenu"
 const watcher = "org.kde.StatusNotifierWatcher"
 const itemPath dbus.ObjectPath = "/StatusNotifierItem"
 const menuPath dbus.ObjectPath = "/Menu"
-
-//go:embed icon.png
-var icon []byte
 
 type Pixmap struct {
 	Width, Height int32
@@ -76,7 +73,7 @@ type Service struct {
 }
 
 func pixmaps() ([]Pixmap, error) {
-	img, err := png.Decode(bytes.NewReader(icon))
+	img, err := png.Decode(bytes.NewReader(desktop.Icon))
 	if err != nil {
 		return nil, err
 	}
@@ -259,20 +256,6 @@ func (s *Service) AboutToShow(id int32) (bool, *dbus.Error) { return false, nil 
 func (s *Service) AboutToShowGroup(ids []int32) ([]int32, []int32, *dbus.Error) {
 	return []int32{}, []int32{}, nil
 }
-func openTerminal(executable string) error {
-	choices := [][]string{{"kitty", "--class", "spotify-tui", "--title", "Spotify TUI", executable, "--no-tray"}, {"foot", "--app-id=spotify-tui", executable, "--no-tray"}, {"alacritty", "--class", "spotify-tui", "-e", executable, "--no-tray"}, {"konsole", "-e", executable, "--no-tray"}, {"gnome-terminal", "--", executable, "--no-tray"}, {"xterm", "-e", executable, "--no-tray"}}
-	for _, args := range choices {
-		if _, e := exec.LookPath(args[0]); e == nil {
-			cmd := exec.Command(args[0], args[1:]...)
-			if e = cmd.Start(); e != nil {
-				return e
-			}
-			go func() { _ = cmd.Wait() }()
-			return nil
-		}
-	}
-	return errors.New("install kitty, foot, alacritty, konsole, gnome-terminal or xterm to open the TUI")
-}
 func (s *Service) action(id int32) {
 	if id == 6 {
 		_ = s.Quit()
@@ -288,7 +271,7 @@ func (s *Service) action(id int32) {
 		var err error
 		switch id {
 		case 1:
-			err = openTerminal(s.executable)
+			err = desktop.Open(ctx, s.executable)
 		case 2:
 			err = s.player.Call(ctx, "toggle_pause", nil, nil)
 		case 3:
