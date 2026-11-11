@@ -378,6 +378,7 @@ async fn bridge(
                             if let Some(current)=sequence.as_mut() {
                                 if current.uris.len()>=5000 {let _=cmd.reply.send(Err("Sequence is full".into()));continue}
                                 current.uris.push(cmd.value["uri"].as_str().unwrap_or_default().to_owned());
+                                shared.state.lock().await["sequence"]=current.snapshot();
                                 let _=cmd.reply.send(Ok(()));continue;
                             }
                         }
@@ -427,7 +428,7 @@ async fn bridge(
                                     if event["type"]=="error" {
                                         if let Some(p)=pending.take(){let _=p.command.reply.send(Err("Provider rejected command; check pairing, available actions and track eligibility".into()));}
                                     }else if pending.as_ref().is_some_and(Pending::complete) {
-                                        if let Some(p)=pending.take(){if let Some(next)=p.sequence {sequence=next;ending=None;}let _=p.command.reply.send(Ok(()));}
+                                        if let Some(p)=pending.take(){if let Some(next)=p.sequence {sequence=next;ending=None;}shared.state.lock().await["sequence"]=sequence.as_ref().map(Sequence::snapshot).unwrap_or(Value::Null);let _=p.command.reply.send(Ok(()));}
                                     }
                                 }
                             },
@@ -437,6 +438,7 @@ async fn bridge(
                         }
                     },
                     _=tick.tick()=>{
+                        shared.state.lock().await["sequence"]=sequence.as_ref().map(Sequence::snapshot).unwrap_or(Value::Null);
                         if pending.is_none() && last_metadata_query.elapsed()>Duration::from_secs(2) {
                             let state=shared.state.lock().await;
                             let incomplete=state["logged_in"]==true && state["uri"].as_str().is_some_and(|uri|!uri.is_empty()) && (state["duration_ms"].as_u64().unwrap_or(0)==0 || state["title"].as_str().unwrap_or_default().is_empty());

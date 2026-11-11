@@ -26,6 +26,9 @@ impl Sequence {
             .ok_or("Invalid sequence offset")? as usize;
         Ok(Self { uris, index })
     }
+    pub fn snapshot(&self) -> Value {
+        json!({"uris":self.uris,"index":self.index})
+    }
     pub fn uri(&self) -> &str {
         &self.uris[self.index]
     }
@@ -73,6 +76,16 @@ pub fn valid_track(uri: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn queue_snapshot_round_trips_offset_and_track_order() {
+        let value = json!({"uris":["spotify:track:a","spotify:track:b"],"index":1});
+        let queue = Sequence::parse(&value).unwrap();
+        assert_eq!(queue.snapshot(), value);
+        assert_eq!(
+            Sequence::parse(&queue.snapshot()).unwrap().uri(),
+            "spotify:track:b"
+        );
+    }
     #[test]
     fn sequence_offsets_and_boundaries() {
         let s = Sequence::parse(
